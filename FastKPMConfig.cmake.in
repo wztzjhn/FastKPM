@@ -1,0 +1,15 @@
+# Defines the following variables
+#  FASTKPM_INCLUDE_DIRS
+#  FASTKPM_LIBRARIES
+
+# Compute paths
+get_filename_component(FASTKPM_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
+set(FASTKPM_INCLUDE_DIRS "@CONF_INCLUDE_DIRS@")
+
+# Our library dependencies (contains definitions for IMPORTED targets)
+if(NOT TARGET fastkpm AND NOT FastKPM_BINARY_DIR)
+  include("${FASTKPM_CMAKE_DIR}/FastKPMTargets.cmake")
+endif()
+
+# These are IMPORTED targets created by FastKPMTargets.cmake
+set(FASTKPM_LIBRARIES fastkpm)
