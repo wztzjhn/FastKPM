@@ -3,11 +3,12 @@ cmake_minimum_required(VERSION 2.8)
 project(FastKPM)
 set(FASTKPM_VERSION 0.1.0)
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake_modules)
+cmake_policy(SET CMP0042 NEW) # @rpath on OSX
 
 
 # -- COMPILE OPTIONS -------------------------------------------
 
-# MPI
+# MPI SUPPORT
 set(WITH_MPI no CACHE BOOL "Build with MPI support")
 
 # Installation directories
@@ -41,14 +42,14 @@ endif()
 
 # -- DEPENDENCIES -------------------------------------------
 
-# Lapack
-# find_package(Lapack REQUIRED)
-# set(LIBS ${LIBS} ${LAPACK_LIBRARIES})
-
 # Armadillo
-find_package(Armadillo 4.300.3 REQUIRED)
+find_package(Armadillo 4.400.2 REQUIRED CONFIG
+             PATHS "/usr/local" "$ENV{ARMA_ROOT}" NO_SYSTEM_ENVIRONMENT_PATH)
 include_directories(SYSTEM ${ARMADILLO_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${ARMADILLO_LIBRARIES})
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp") # For multi-threaded MKL
+endif()
 
 # Thread Building Blocks
 find_package(TBB)
