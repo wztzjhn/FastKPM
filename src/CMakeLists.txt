@@ -1,13 +1,12 @@
 set(KPM_SRC
+  timer.cpp
   fastkpm.cpp
   engine_cpu.cpp
   engine_cusparse.cpp
-  timer.cpp
 )
 
 set(KPM_INCLUDE
   fastkpm.h
-  timer.h
 )
 
 add_library(fastkpm SHARED ${KPM_SRC})

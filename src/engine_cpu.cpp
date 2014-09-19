@@ -26,7 +26,7 @@ namespace fkpm {
             return mu;
         }
         
-        arma::cx_mat& occupiedOrbital(Vec<double> const& c) {
+        arma::cx_mat& occupied_orbital(Vec<double> const& c) {
             int M = c.size();
             arma::cx_mat a0(n, s), a1(n, s), a2(n, s);
             a0 = R;
@@ -42,7 +42,7 @@ namespace fkpm {
         }
     };
     
-    std::shared_ptr<EngineCx> mkEngineCx_CPU(int n, int s) {
+    std::shared_ptr<EngineCx> mk_engine_cx_CPU(int n, int s) {
         return std::make_shared<EngineCx_CPU>(n, s);
     }
 }

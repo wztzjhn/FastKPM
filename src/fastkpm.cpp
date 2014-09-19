@@ -6,7 +6,7 @@
 //
 //
 
-#include <cstdlib>
+// #include <cstdlib>
 #include <cassert>
 #include <algorithm>
 #ifdef WITH_TBB
@@ -14,8 +14,9 @@
 #endif
 #include "fastkpm.h"
 
+
 namespace fkpm {
-    const double Pi = 3.141592653589793238463;
+    static const double Pi = 3.141592653589793238463;
     
     double EnergyScale::avg() const { return (hi + lo) / 2.0; }
     double EnergyScale::mag() const { return (hi - lo) / 2.0; }
@@ -35,7 +36,7 @@ namespace fkpm {
         return stream << "< lo = " << es.lo << " hi = " << es.hi << " >\n";
     }
     
-    Vec<double> jacksonKernel(int M) {
+    Vec<double> jackson_kernel(int M) {
         auto ret = Vec<double>(M);
         double Mp = M+1.0;
         for (int m = 0; m < M; m++) {
@@ -45,7 +46,7 @@ namespace fkpm {
     }
     
     
-    void chebyshevFillArray(double x, Vec<double>& ret) {
+    void chebyshev_fill_array(double x, Vec<double>& ret) {
         if (ret.size() > 0)
             ret[0] = 1.0;
         if (ret.size() > 1)
@@ -55,18 +56,18 @@ namespace fkpm {
         }
     }
     
-    Vec<double> expansionCoefficients(int M, int Mq, std::function<double(double)> f, EnergyScale es) {
+    Vec<double> expansion_coefficients(int M, int Mq, std::function<double(double)> f, EnergyScale es) {
         // TODO: replace with DCT-II, f -> fp
         auto fp = Vec<double>(Mq, 0.0);
         auto T = Vec<double>(M);
         for (int i = 0; i < Mq; i++) {
             double x_i = cos(Pi * (i+0.5) / Mq);
-            chebyshevFillArray(x_i, T);
+            chebyshev_fill_array(x_i, T);
             for (int m = 0; m < M; m++) {
                 fp[m] += f(es.unscale(x_i)) * T[m];
             }
         }
-        auto kernel = jacksonKernel(M);
+        auto kernel = jackson_kernel(M);
         auto ret = Vec<double>(M);
         for (int m = 0; m < M; m++) {
             ret[m] = (m == 0 ? 1.0 : 2.0) * kernel[m] * fp[m] / Mq;
@@ -74,20 +75,20 @@ namespace fkpm {
         return ret;
     }
     
-    Vec<double> momentTransform(Vec<double> const& moments, int Mq) {
+    Vec<double> moment_transform(Vec<double> const& moments, int Mq) {
         int M = moments.size();
         auto T = Vec<double>(M);
         auto mup = Vec<double>(M);
         auto gamma = Vec<double>(Mq);
         
-        auto kernel = jacksonKernel(M);
+        auto kernel = jackson_kernel(M);
         for (int m = 0; m < M; m++)
             mup[m] = moments[m] * kernel[m];
         
         // TODO: replace with DCT-III, mup -> gamma
         for (int i = 0; i < Mq; i++) {
             double x_i = cos(Pi * (i+0.5) / Mq);
-            chebyshevFillArray(x_i, T); // T_m(x_i) = cos(m pi (i+1/2) / Mq)
+            chebyshev_fill_array(x_i, T); // T_m(x_i) = cos(m pi (i+1/2) / Mq)
             for (int m = 0; m < M; m++) {
                 gamma[i] += (m == 0 ? 1 : 2) * mup[m] * T[m];
             }
@@ -95,7 +96,7 @@ namespace fkpm {
         return gamma;
     }
     
-    double densityProduct(Vec<double> const& gamma, std::function<double(double)> f, EnergyScale es) {
+    double density_product(Vec<double> const& gamma, std::function<double(double)> f, EnergyScale es) {
         int Mq = gamma.size();
         double ret = 0.0;
         for (int i = 0; i < Mq; i++) {
@@ -105,7 +106,7 @@ namespace fkpm {
         return ret / Mq;
     }
     
-    void densityFunction(Vec<double> const& gamma, EnergyScale es, Vec<double>& x, Vec<double>& rho) {
+    void density_function(Vec<double> const& gamma, EnergyScale es, Vec<double>& x, Vec<double>& rho) {
         int Mq = gamma.size();
         x.resize(Mq);
         rho.resize(Mq);
@@ -116,7 +117,7 @@ namespace fkpm {
         }
     }
     
-    void integratedDensityFunction(Vec<double> const& gamma, EnergyScale es, Vec<double>& x, Vec<double>& irho) {
+    void integrated_density_function(Vec<double> const& gamma, EnergyScale es, Vec<double>& x, Vec<double>& irho) {
         int Mq = gamma.size();
         x.resize(Mq);
         irho.resize(Mq);
@@ -129,7 +130,7 @@ namespace fkpm {
         }
     }
     
-    EnergyScale energyScale(arma::sp_cx_mat const& H, double extra, double tolerance) {
+    EnergyScale energy_scale(arma::sp_cx_mat const& H, double extra, double tolerance) {
         arma::cx_vec eigval;
         eigs_gen(eigval, H, 1, "sr", tolerance);
         double eig_min = eigval(0).real();
@@ -139,9 +140,9 @@ namespace fkpm {
         return {eig_min-slack, eig_max+slack};
     }
     
-    double fermiEnergy(double x, double kB_T, double mu) {
-        double alpha = (x-mu)/abs(kB_T);
-        if (kB_T == 0.0 || abs(alpha) > 20) {
+    double fermi_energy(double x, double kB_T, double mu) {
+        double alpha = (x-mu)/std::abs(kB_T);
+        if (kB_T == 0.0 || std::abs(alpha) > 20) {
             return (x < mu) ? (x-mu) : 0.0;
         }
         else {
@@ -149,9 +150,9 @@ namespace fkpm {
         }
     }
     
-    double fermiDensity(double x, double kB_T, double mu) {
-        double alpha = (x-mu)/abs(kB_T);
-        if (kB_T == 0.0 || abs(alpha) > 20) {
+    double fermi_density(double x, double kB_T, double mu) {
+        double alpha = (x-mu)/std::abs(kB_T);
+        if (kB_T == 0.0 || std::abs(alpha) > 20) {
             return (x < mu) ? 1.0 : 0.0;
         }
         else {
@@ -159,13 +160,13 @@ namespace fkpm {
         }
     }
     
-    double electronicGrandEnergy(Vec<double> const& gamma, EnergyScale const& es, double kB_T, double mu) {
+    double electronic_grand_energy(Vec<double> const& gamma, EnergyScale const& es, double kB_T, double mu) {
         using std::placeholders::_1;
-        return densityProduct(gamma, std::bind(fermiEnergy, _1, kB_T, mu), es);
+        return density_product(gamma, std::bind(fermi_energy, _1, kB_T, mu), es);
     }
     
-    // TODO: use fermiEnergy() and be smarter about filling
-    double electronicEnergyExact(arma::vec evals, double filling) {
+    // TODO: use fermi_energy() and be smarter about filling
+    double electronic_energy_exact(arma::vec evals, double filling) {
         std::sort(evals.begin(), evals.end());
         int numFilled = (int)(filling*evals.size());
         double acc = 0;
@@ -175,13 +176,13 @@ namespace fkpm {
         return acc;
     }
     
-    double fillingToMu(Vec<double> const& gamma, EnergyScale const& es, double kB_T, double filling, double delta_filling) {
+    double filling_to_mu(Vec<double> const& gamma, EnergyScale const& es, double kB_T, double filling, double delta_filling) {
         Vec<double> x, irho;
-        integratedDensityFunction(gamma, es, x, irho);
-        double numTot = densityProduct(gamma, [](double x){return 1;}, es);
+        integrated_density_function(gamma, es, x, irho);
+        double num_tot = density_product(gamma, [](double x){return 1;}, es);
         assert(0 <= filling && filling <= 1.0);
-        double n1 = numTot * std::max(filling - delta_filling, 0.0);
-        double n2 = numTot * std::min(filling + delta_filling, numTot);
+        double n1 = num_tot * std::max(filling - delta_filling, 0.0);
+        double n2 = num_tot * std::min(filling + delta_filling, num_tot);
         // TODO: generalize to finite temperature
         //assert(kB_T == 0);
         int i1 = std::find_if(irho.begin(), irho.end(), [&](double x){return x > n1;}) - irho.begin();
@@ -191,42 +192,19 @@ namespace fkpm {
         return (x[i1] + x[i1-1] + x[i2] + x[i2-1]) / 4.0;
     }
     
-    double muToFilling(Vec<double> const& gamma, EnergyScale const& es, double kB_T, double mu) {
+    double mu_to_filling(Vec<double> const& gamma, EnergyScale const& es, double kB_T, double mu) {
         using std::placeholders::_1;
-        double numOcc = densityProduct(gamma, std::bind(fermiDensity, _1, kB_T, mu), es);
-        double numTot = densityProduct(gamma, [](double x){return 1;}, es);
-        return numOcc/numTot;
+        double num_occ = density_product(gamma, std::bind(fermi_density, _1, kB_T, mu), es);
+        double num_tot = density_product(gamma, [](double x){return 1;}, es);
+        return num_occ/num_tot;
     }
 
-    arma::sp_cx_mat buildSparseCx(Vec<arma::uword>& idx, Vec<arma::cx_double>& val, int n_rows, int n_cols) {
-#ifdef WITH_TBB
-        struct MatrixElem {
-            arma::uword i;
-            arma::uword j;
-            arma::cx_double val;
-        };
-        int n_elems = val.size();
-        Vec<MatrixElem> elems(n_elems);
-        for (int i = 0; i < n_elems; i++) {
-            elems[i] = { idx[2*i+0], idx[2*i+1], val[i] };
-        }
-        auto cmp = [&](MatrixElem const& x, MatrixElem const& y) {
-            return (x.j == y.j) ? (x.i < y.i) : (x.j < y.j);
-        };
-        tbb::parallel_sort(elems.begin(), elems.end(), cmp);
-        
-        for (int i = 0; i < n_elems; i++) {
-            idx[2*i+0] = elems[i].i;
-            idx[2*i+1] = elems[i].j;
-            val[i] = elems[i].val;
-        }
-        return arma::sp_cx_mat(arma::umat(idx.data(), 2, idx.size()/2), arma::cx_vec(val), n_rows, n_cols, false);
-#else
+    arma::sp_cx_mat build_sparse_cx(Vec<arma::uword>& idx, Vec<arma::cx_double>& val, int n_rows, int n_cols) {
         return arma::sp_cx_mat(arma::umat(idx.data(), 2, idx.size()/2), arma::cx_vec(val), n_rows, n_cols);
-#endif
     }
     
-    arma::cx_double randomPhaseCx(RNG& rng) {
+    // Random number from {+1, i, -1, -i}
+    arma::cx_double random_phase_cx(RNG& rng) {
         std::uniform_int_distribution<uint32_t> dist4(0,3);
         switch (dist4(rng)) {
             case 0: return {+1,  0};
@@ -237,31 +215,31 @@ namespace fkpm {
         assert(false);
     }
     
-    arma::cx_double randomNormalCx(RNG& rng) {
-        std::normal_distribution<double> normalDist;
-        return arma::cx_double(normalDist(rng), normalDist(rng));
+    EngineCx::EngineCx(int n, int s): n(n), s(s) {
+        R = arma::cx_mat(n, s);
+        xi = arma::cx_mat(n, s);
     }
     
-    void uncorrelatedVectorsCx(RNG& rng, arma::cx_mat& R) {
+    void EngineCx::set_R_uncorrelated(RNG& rng) {
         double x = 1.0 / sqrt(R.n_cols);
         for (int i = 0; i < R.n_rows; i++) {
             for (int j = 0; j < R.n_cols; j++) {
-                R(i, j) = randomPhaseCx(rng) * x;
+                R(i, j) = random_phase_cx(rng) * x;
             }
         }
     }
     
-    void correlatedVectorsCx(Vec<int> const& grouping, RNG& rng, arma::cx_mat& R) {
+    void EngineCx::set_R_correlated(Vec<int> const& grouping, RNG& rng) {
         assert(R.n_rows == grouping.size());
         R.fill(0.0);
         for (int i = 0; i < R.n_rows; i++) {
             int g = grouping[i];
             assert(0 <= g && g < R.n_cols);
-            R(i, g) = randomPhaseCx(rng);
+            R(i, g) = random_phase_cx(rng);
         }
     }
     
-    void allVectorsCx(arma::cx_mat& R) {
+    void EngineCx::set_R_identity() {
         assert(R.n_rows == R.n_cols);
         R.fill(0.0);
         for (int i = 0; i < R.n_rows; i++) {
@@ -269,12 +247,7 @@ namespace fkpm {
         }
     }
     
-    EngineCx::EngineCx(int n, int s): n(n), s(s) {
-        R = arma::cx_mat(n, s);
-        xi = arma::cx_mat(n, s);
-    }
-    
-    void EngineCx::setHamiltonian(arma::sp_cx_mat const& H, EnergyScale const& es) {
+    void EngineCx::set_H(arma::sp_cx_mat const& H, EnergyScale const& es) {
         this-> es = es;
         Hs = es.scale(H);
         dE_dH = Hs;
@@ -291,11 +264,11 @@ namespace fkpm {
     }
     
     double EngineCx::trace(Vec<double> const& c, arma::sp_cx_mat const& A) {
-        return arma::cdot(R, A*occupiedOrbital(c)).real();
+        return arma::cdot(R, A*occupied_orbital(c)).real();
     }
     
     arma::sp_cx_mat& EngineCx::deriv(Vec<double> const& c) {
-        auto xi = occupiedOrbital(c);
+        auto xi = occupied_orbital(c);
         dE_dH = Hs;
         for (int j = 0; j < n; j++) {
             for (int iter = Hs.col_ptrs[j]; iter < Hs.col_ptrs[j+1]; iter++) {
@@ -307,11 +280,11 @@ namespace fkpm {
         return dE_dH;
     }
     
-    std::shared_ptr<EngineCx> mkEngineCx(int n, int s) {
+    std::shared_ptr<EngineCx> mk_engine_cx(int n, int s) {
         std::shared_ptr<EngineCx> ret;
-        ret = mkEngineCx_cuSPARSE(n, s);
+        ret = mk_engine_cx_cuSPARSE(n, s);
         if (ret == nullptr)
-            ret = mkEngineCx_CPU(n, s);
+            ret = mk_engine_cx_CPU(n, s);
         return ret;
     }
 }

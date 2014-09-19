@@ -6,8 +6,7 @@
 //
 //
 
-#include <iostream>
-#include "timer.h"
+#include "fastkpm.h"
 
 namespace fkpm {
     Timer timer[10];
@@ -16,20 +15,14 @@ namespace fkpm {
         reset();
     }
     
-    void Timer::enable() {
-        mute = false;
-        reset();
-    }
-    
     void Timer::reset() {
-        t = std::chrono::system_clock::now();
+        t0 = std::chrono::system_clock::now();
     }
     
-    void Timer::print(std::string msg) {
-        if (!mute) {
-            std::chrono::duration<double> dt = std::chrono::system_clock::now() - t;
-            std::cout << msg << " : " << dt.count() << "s\n";
-        }
-        reset();
+    double Timer::measure() {
+        auto t1 = std::chrono::system_clock::now();
+        std::chrono::duration<double> dt = t1 - t0;
+        t0 = t1;
+        return dt.count();
     }
 }
