@@ -10,7 +10,6 @@
 #define __tibidy__fastkpm__
 
 #include <random>
-// #include <memory>
 #include <vector>
 #include <armadillo>
 #include <chrono>
@@ -18,6 +17,9 @@
 
 namespace fkpm {
     typedef std::mt19937 RNG;
+    
+    template <typename T>
+    using Vec = std::vector<T>;
     
     class Timer {
     public:
@@ -28,30 +30,29 @@ namespace fkpm {
     };
     extern Timer timer[10];
     
+    // Sparse matrix in coordinate list format
     template <typename T>
-    using Vec = std::vector<T>;
-    
-    template <typename T>
-    arma::Mat<T> sparse_to_dense(arma::SpMat<T> that) {
-        int m = that.n_rows;
-        return arma::eye<arma::Mat<T>>(m, m) * that;
-    }
-    
-    template <typename T>
-    class MatrixBuilder {
+    class SpMatCoo {
     public:
+        int n_rows, n_cols;
         Vec<arma::uword> idx;
-        Vec<arma::cx_double> val;
+        Vec<T> val;
+        SpMatCoo(int n_rows, int n_cols): n_rows(n_rows), n_cols(n_cols) {}
+        void clear() {
+            idx.resize(0);
+            val.resize(0);
+        }
         void add(int i, int j, T v) {
             idx.push_back(i);
             idx.push_back(j);
             val.push_back(v);
         }
-        arma::SpMat<T> build(int n_rows, int n_cols) {
-            return arma::SpMat<T>(arma::umat(idx.data(), 2, idx.size()/2), arma::cx_vec(val), n_rows, n_cols);
+        arma::SpMat<T> to_arma() const {
+            return arma::SpMat<T>(arma::umat(idx.data(), 2, idx.size()/2), arma::Col<T>(val), n_rows, n_cols);
         }
     };
     
+    // Scale eigenvalues within range (-1, +1)
     struct EnergyScale {
         double lo, hi;
         EnergyScale(double lo=0, double hi=0): lo(lo), hi(hi) {}
@@ -59,9 +60,14 @@ namespace fkpm {
         double mag() const;
         double scale(double x) const;
         double unscale(double x) const;
-        arma::sp_cx_mat scale(arma::sp_cx_mat const& H) const;
     };
+    
+    // Print EnergyScale
     std::ostream& operator<< (std::ostream& stream, EnergyScale const& es);
+    
+    // Use Lanczos to bound eigenvalues of H, and determine appropriate rescaling
+    template<typename T>
+    EnergyScale energy_scale(SpMatCoo<T> const& H, double extend, double tolerance);
     
     
     // Used to damp Gibbs oscillations in KPM estimates
@@ -88,9 +94,6 @@ namespace fkpm {
     // Density of states \int theta(x-x') rho(x') dx' at Chebyshev points x
     void integrated_density_function(Vec<double> const& gamma, EnergyScale es, Vec<double>& x, Vec<double>& irho);
     
-    // Use Lanczos to bound eigenvalues of H, and determine appropriate rescale scaling for KPM
-    EnergyScale energy_scale(arma::sp_cx_mat const& H, double extend, double tolerance);
-    
     // Grand potential energy density of an electronic state at x
     double fermi_energy(double x, double kB_T, double mu);
     
@@ -110,8 +113,6 @@ namespace fkpm {
     // Find filling fraction corresponding to chemical potential
     double mu_to_filling(Vec<double> const& gamma, EnergyScale const& es, double kB_T, double mu);
     
-    // Builds sparse Armadillo matrix efficiently
-    arma::sp_cx_mat build_sparse_cx(Vec<arma::uword> & idx, Vec<arma::cx_double> & val, int n_rows, int n_cols);
     
     class EngineCx {
     public:
@@ -134,7 +135,7 @@ namespace fkpm {
         virtual void set_R_identity();
         
         // Set Hamiltonian and energy scale
-        virtual void set_H(arma::sp_cx_mat const& H, EnergyScale const& es) = 0;
+        virtual void set_H(SpMatCoo<arma::cx_double> const& H, EnergyScale const& es) = 0;
         
         // Chebyshev moments: mu_m = tr T_m(Hs) ~ <R| T_m(Hs) |R>
         virtual Vec<double> moments(int M) = 0;

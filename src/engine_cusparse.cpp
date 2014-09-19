@@ -48,7 +48,6 @@ namespace fkpm {
     class EngineCx_cuSPARSE: public EngineCx {
     public:
         arma::sp_cx_mat Hs;    // Scaled Hamiltonian
-        arma::sp_cx_mat dE_dH; // Grand free energy matrix derivative
         
         int device;
         cusparseHandle_t cs_handle;
@@ -90,10 +89,10 @@ namespace fkpm {
             TRY(cudaFree(HVal_d));
         }
         
-        void set_H(arma::sp_cx_mat const& H, EnergyScale const& es) {
+        void set_H(SpMatCoo<arma::cx_double> const& H, EnergyScale const& es) {
             this-> es = es;
-            Hs = es.scale(H);
-            dE_dH = Hs;
+            auto I = arma::speye<arma::sp_cx_mat>(n, n);
+            Hs = (H.to_arma()-I*es.avg()) / es.mag();
             
             HColIndex_sz = Hs.n_nonzero*sizeof(arma::uword);
             HVal_sz      = Hs.n_nonzero*sizeof(arma::cx_float);

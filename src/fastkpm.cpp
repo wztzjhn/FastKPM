@@ -19,21 +19,31 @@ namespace fkpm {
     static const double Pi = 3.141592653589793238463;
     
     double EnergyScale::avg() const { return (hi + lo) / 2.0; }
+    
     double EnergyScale::mag() const { return (hi - lo) / 2.0; }
+    
     double EnergyScale::scale(double x) const {
         return (x - avg()) / mag();
     }
+    
     double EnergyScale::unscale(double x) const {
         return x * mag() + avg();
-    }
-    arma::sp_cx_mat EnergyScale::scale(arma::sp_cx_mat const& H) const {
-        int n = H.n_rows;
-        auto I = arma::speye<arma::sp_cx_mat>(n, n);
-        return (H - I*avg()) / mag();
     }
     
     std::ostream& operator<< (std::ostream& stream, EnergyScale const& es) {
         return stream << "< lo = " << es.lo << " hi = " << es.hi << " >\n";
+    }
+    
+    template<>
+    EnergyScale energy_scale(SpMatCoo<arma::cx_double> const& H, double extra, double tolerance) {
+        auto H_a = H.to_arma();
+        arma::cx_vec eigval;
+        arma::eigs_gen(eigval, H_a, 1, "sr", tolerance);
+        double eig_min = eigval(0).real();
+        arma::eigs_gen(eigval, H_a, 1, "lr", tolerance);
+        double eig_max = eigval(0).real();
+        double slack = extra * (eig_max - eig_min);
+        return {eig_min-slack, eig_max+slack};
     }
     
     Vec<double> jackson_kernel(int M) {
@@ -139,16 +149,6 @@ namespace fkpm {
         }
     }
     
-    EnergyScale energy_scale(arma::sp_cx_mat const& H, double extra, double tolerance) {
-        arma::cx_vec eigval;
-        eigs_gen(eigval, H, 1, "sr", tolerance);
-        double eig_min = eigval(0).real();
-        eigs_gen(eigval, H, 1, "lr", tolerance);
-        double eig_max = eigval(0).real();
-        double slack = extra * (eig_max - eig_min);
-        return {eig_min-slack, eig_max+slack};
-    }
-    
     double fermi_energy(double x, double kB_T, double mu) {
         double alpha = (x-mu)/std::abs(kB_T);
         if (kB_T == 0.0 || std::abs(alpha) > 20) {
@@ -206,10 +206,6 @@ namespace fkpm {
         double num_occ = density_product(gamma, std::bind(fermi_density, _1, kB_T, mu), es);
         double num_tot = density_product(gamma, [](double x){return 1;}, es);
         return num_occ/num_tot;
-    }
-
-    arma::sp_cx_mat build_sparse_cx(Vec<arma::uword>& idx, Vec<arma::cx_double>& val, int n_rows, int n_cols) {
-        return arma::sp_cx_mat(arma::umat(idx.data(), 2, idx.size()/2), arma::cx_vec(val), n_rows, n_cols);
     }
     
     // Random number from {+1, i, -1, -i}

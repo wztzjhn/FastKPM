@@ -5,14 +5,13 @@ namespace fkpm {
     class EngineCx_CPU: public EngineCx {
     public:
         arma::sp_cx_mat Hs;    // Scaled Hamiltonian
-        arma::sp_cx_mat dE_dH; // Grand free energy matrix derivative
         
         EngineCx_CPU(int n, int s): EngineCx(n, s) {}
         
-        void set_H(arma::sp_cx_mat const& H, EnergyScale const& es) {
+        void set_H(SpMatCoo<arma::cx_double> const& H, EnergyScale const& es) {
             this-> es = es;
-            Hs = es.scale(H);
-            dE_dH = Hs;
+            auto I = arma::speye<arma::sp_cx_mat>(n, n);
+            Hs = (H.to_arma()-I*es.avg()) / es.mag();
         }
         
         Vec<double> moments(int M) {
