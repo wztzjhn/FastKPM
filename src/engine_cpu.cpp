@@ -4,7 +4,16 @@ namespace fkpm {
     
     class EngineCx_CPU: public EngineCx {
     public:
+        arma::sp_cx_mat Hs;    // Scaled Hamiltonian
+        arma::sp_cx_mat dE_dH; // Grand free energy matrix derivative
+        
         EngineCx_CPU(int n, int s): EngineCx(n, s) {}
+        
+        void set_H(arma::sp_cx_mat const& H, EnergyScale const& es) {
+            this-> es = es;
+            Hs = es.scale(H);
+            dE_dH = Hs;
+        }
         
         Vec<double> moments(int M) {
             Vec<double> mu(M);
@@ -26,7 +35,7 @@ namespace fkpm {
             return mu;
         }
         
-        arma::cx_mat& occupied_orbital(Vec<double> const& c) {
+        void stoch_orbital(Vec<double> const& c) {
             int M = c.size();
             arma::cx_mat a0(n, s), a1(n, s), a2(n, s);
             a0 = R;
@@ -38,7 +47,6 @@ namespace fkpm {
                 a0 = a1;
                 a1 = a2;
             }
-            return xi;
         }
     };
     

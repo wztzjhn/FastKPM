@@ -73,6 +73,9 @@ namespace fkpm {
     // Coefficients c_m that satisfy f(x) = \sum_m T_m(x) c_m
     Vec<double> expansion_coefficients(int M, int Mq, std::function<double(double)> f, EnergyScale es);
     
+    // Calculate \sum c_m mu_m
+    double moment_product(Vec<double> const& c, Vec<double> const& mu);
+    
     // Transformation of moments from mu to gamma, which corresponds to the density of states
     Vec<double> moment_transform(Vec<double> const& moments, int Mq);
     
@@ -114,11 +117,10 @@ namespace fkpm {
     public:
         int n;                 // Rows (columns) of Hamiltonian
         int s;                 // Columns of random matrix
+        // TODO: hide?
         EnergyScale es;        // Scaling bounds
         arma::cx_mat R;        // Random vectors
         arma::cx_mat xi;       // Occupied orbitals
-        arma::sp_cx_mat Hs;    // Scaled Hamiltonian
-        arma::sp_cx_mat dE_dH; // Grand free energy matrix derivative
         
         EngineCx(int n, int s);
         
@@ -131,25 +133,18 @@ namespace fkpm {
         // R is the identity matrix
         virtual void set_R_identity();
         
-        // Approximate trace: <R| \sum c_m T_m(Hs) |R>
-        virtual double trace(Vec<double> const& c);
-        
-        // Approximate trace: <R| A \sum c_m T_m(Hs) |R>
-        virtual double trace(Vec<double> const& c, arma::sp_cx_mat const& A);
-        
-        // Re(\sum_m c_m T_m(Hs) |R><R|) at nonzero H_ij
-        // When f(x) = \sum_m c_m T_m(x) is the Fermi function, the return value is the
-        // free energy matrix derivative dE/dH.
-        virtual arma::sp_cx_mat& deriv(Vec<double> const& c);
-        
         // Set Hamiltonian and energy scale
-        virtual void set_H(arma::sp_cx_mat const& H, EnergyScale const& es);
+        virtual void set_H(arma::sp_cx_mat const& H, EnergyScale const& es) = 0;
         
-        // Chebyshev moments: mu_m = <R| T_m(Hs) |R>
+        // Chebyshev moments: mu_m = tr T_m(Hs) ~ <R| T_m(Hs) |R>
         virtual Vec<double> moments(int M) = 0;
         
-        // Stochastic orbital: \sum_m c_m T_m(Hs) |R>
-        virtual arma::cx_mat& occupied_orbital(Vec<double> const& c) = 0;
+        // Stochastic orbital: xi = \sum_m c_m T_m(Hs) |R>
+        virtual void stoch_orbital(Vec<double> const& c) = 0;
+
+        // Approximates B_{ij} ~ Re(xi R^\dagger)_{ij}.
+        // Assumes stoch_orbital() has already been called.
+        arma::cx_double stoch_element(int i, int j);
     };
     
     std::shared_ptr<EngineCx> mk_engine_cx_CPU(int n, int s);

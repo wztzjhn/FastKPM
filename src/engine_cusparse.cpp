@@ -47,6 +47,9 @@ namespace fkpm {
     
     class EngineCx_cuSPARSE: public EngineCx {
     public:
+        arma::sp_cx_mat Hs;    // Scaled Hamiltonian
+        arma::sp_cx_mat dE_dH; // Grand free energy matrix derivative
+        
         int device;
         cusparseHandle_t cs_handle;
         cusparseMatDescr_t cs_mat_descr;
@@ -88,7 +91,10 @@ namespace fkpm {
         }
         
         void set_H(arma::sp_cx_mat const& H, EnergyScale const& es) {
-            EngineCx::set_H(H, es);
+            this-> es = es;
+            Hs = es.scale(H);
+            dE_dH = Hs;
+            
             HColIndex_sz = Hs.n_nonzero*sizeof(arma::uword);
             HVal_sz      = Hs.n_nonzero*sizeof(arma::cx_float);
             
@@ -154,7 +160,7 @@ namespace fkpm {
             return mu;
         }
         
-        arma::cx_mat& occupied_orbital(Vec<double> const& c) {
+        void stoch_orbital(Vec<double> const& c) {
             TRY(cudaSetDevice(device));
             Vec<float> Rf(2*R.size());
             double_to_float((double *)R.memptr(), Rf.size(), Rf.data());
@@ -187,7 +193,6 @@ namespace fkpm {
             Vec<float> temp(2*n*s);
             cudaMemcpy(temp.data(), xi_d, R_sz, cudaMemcpyDeviceToHost);
             float_to_double(temp.data(), temp.size(), (double *)xi.memptr());
-            return xi;
         }
     };
     

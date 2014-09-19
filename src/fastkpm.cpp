@@ -96,6 +96,15 @@ namespace fkpm {
         return gamma;
     }
     
+    double moment_product(Vec<double> const& c, Vec<double> const& mu) {
+        int M = c.size();
+        double ret = 0;
+        for (int i = 0; i < M; i++) {
+            ret += c[i]*mu[i];
+        }
+        return ret;
+    }
+
     double density_product(Vec<double> const& gamma, std::function<double(double)> f, EnergyScale es) {
         int Mq = gamma.size();
         double ret = 0.0;
@@ -247,37 +256,8 @@ namespace fkpm {
         }
     }
     
-    void EngineCx::set_H(arma::sp_cx_mat const& H, EnergyScale const& es) {
-        this-> es = es;
-        Hs = es.scale(H);
-        dE_dH = Hs;
-    }
-    
-    double EngineCx::trace(Vec<double> const& c) {
-        int M = c.size();
-        auto mu = moments(M);
-        double ret = 0;
-        for (int i = 0; i < M; i++) {
-            ret += c[i]*mu[i];
-        }
-        return ret;
-    }
-    
-    double EngineCx::trace(Vec<double> const& c, arma::sp_cx_mat const& A) {
-        return arma::cdot(R, A*occupied_orbital(c)).real();
-    }
-    
-    arma::sp_cx_mat& EngineCx::deriv(Vec<double> const& c) {
-        auto xi = occupied_orbital(c);
-        dE_dH = Hs;
-        for (int j = 0; j < n; j++) {
-            for (int iter = Hs.col_ptrs[j]; iter < Hs.col_ptrs[j+1]; iter++) {
-                int i = Hs.row_indices[iter];
-                dE_dH(i, j) = arma::cdot(R.row(j), xi.row(i)).real();
-            }
-        }
-
-        return dE_dH;
+    arma::cx_double EngineCx::stoch_element(int i, int j) {
+        return arma::cdot(R.row(j), xi.row(i)).real();
     }
     
     std::shared_ptr<EngineCx> mk_engine_cx(int n, int s) {
