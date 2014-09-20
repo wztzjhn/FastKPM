@@ -1,4 +1,6 @@
+#include <cassert>
 #include "fastkpm.h"
+
 
 namespace fkpm {
     

@@ -11,9 +11,9 @@
 
 #include <random>
 #include <vector>
-#include <armadillo>
 #include <chrono>
-#include <cassert>
+#include <memory>
+#include <armadillo>
 
 
 namespace fkpm {
