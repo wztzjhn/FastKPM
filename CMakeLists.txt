@@ -49,9 +49,6 @@ find_package(Armadillo 4.400.2 REQUIRED CONFIG
              PATHS "/usr/local" "$ENV{ARMA_ROOT}" NO_SYSTEM_ENVIRONMENT_PATH)
 include_directories(SYSTEM ${ARMADILLO_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${ARMADILLO_LIBRARIES})
-if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp") # For multi-threaded MKL
-endif()
 
 # Thread Building Blocks
 find_package(TBB)
