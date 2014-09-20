@@ -69,11 +69,10 @@ namespace fkpm {
     // Scale eigenvalues within range (-1, +1)
     struct EnergyScale {
         double lo, hi;
-        EnergyScale(double lo=0, double hi=0): lo(lo), hi(hi) {}
-        double avg() const;
-        double mag() const;
-        double scale(double x) const;
-        double unscale(double x) const;
+        double avg() const { return (hi + lo) / 2.0; }
+        double mag() const { return (hi - lo) / 2.0; }
+        double scale(double x) const { return (x - avg()) / mag(); }
+        double unscale(double x) const { return x * mag() + avg(); }
     };
     
     // Print EnergyScale
@@ -165,11 +164,11 @@ namespace fkpm {
         virtual void stoch_orbital(Vec<double> const& c);
     };
     
-    // CuSparse
+    // CuSPARSE engine
     template <typename T>
     std::shared_ptr<Engine<T>> mk_engine_cuSPARSE();
     
-    // Fastest EngineCx available
+    // Fastest engine available
     template <typename T>
     std::shared_ptr<Engine<T>> mk_engine();
     std::shared_ptr<Engine<double>> mk_engine_re();

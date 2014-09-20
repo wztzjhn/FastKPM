@@ -1,7 +1,7 @@
 set(KPM_SRC
   timer.cpp
   fastkpm.cpp
-  engine_cpu.cpp
+  engine.cpp
   engine_cusparse.cpp
 )
 

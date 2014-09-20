@@ -18,18 +18,6 @@
 namespace fkpm {
     static const double Pi = 3.141592653589793238463;
     
-    double EnergyScale::avg() const { return (hi + lo) / 2.0; }
-    
-    double EnergyScale::mag() const { return (hi - lo) / 2.0; }
-    
-    double EnergyScale::scale(double x) const {
-        return (x - avg()) / mag();
-    }
-    
-    double EnergyScale::unscale(double x) const {
-        return x * mag() + avg();
-    }
-    
     std::ostream& operator<< (std::ostream& stream, EnergyScale const& es) {
         return stream << "< lo = " << es.lo << " hi = " << es.hi << " >\n";
     }
