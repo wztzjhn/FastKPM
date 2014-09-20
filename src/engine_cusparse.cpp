@@ -9,12 +9,15 @@
 
 #include "fastkpm.h"
 
-#ifndef WITH_CUDA
+#ifndef WITH_CUDA1
 
 namespace fkpm {
-    std::shared_ptr<EngineCx> mk_engine_cx_cuSPARSE(int n, int s) {
+    template <typename T>
+    std::shared_ptr<Engine<T>> mk_engine_cuSPARSE() {
         return nullptr;
     }
+    template std::shared_ptr<Engine<double>> mk_engine_cuSPARSE();
+    template std::shared_ptr<Engine<cx_double>> mk_engine_cuSPARSE();
 }
 
 #else
@@ -89,7 +92,7 @@ namespace fkpm {
             TRY(cudaFree(HVal_d));
         }
         
-        void set_H(SpMatCoo<arma::cx_double> const& H, EnergyScale const& es) {
+        void set_H(SpMatCoo<cx_double> const& H, EnergyScale const& es) {
             this-> es = es;
             auto I = arma::speye<arma::sp_cx_mat>(n, n);
             Hs = (H.to_arma()-I*es.avg()) / es.mag();
@@ -118,7 +121,7 @@ namespace fkpm {
         }
         
         // C = alpha H B + beta C
-        void cgemm_H(arma::cx_double alpha, void *B_d, arma::cx_double beta, void *C_d) {
+        void cgemm_H(cx_double alpha, void *B_d, cx_double beta, void *C_d) {
             auto alpha_f = make_cuComplex(alpha.real(), alpha.imag());
             auto beta_f  = make_cuComplex(beta.real(),  beta.imag());
             TRY(cusparseCcsrmm(cs_handle, CUSPARSE_OPERATION_NON_TRANSPOSE,

@@ -34,8 +34,20 @@ namespace fkpm {
         return stream << "< lo = " << es.lo << " hi = " << es.hi << " >\n";
     }
     
-    template<>
-    EnergyScale energy_scale(SpMatCoo<arma::cx_double> const& H, double extra, double tolerance) {
+    template <>
+    EnergyScale energy_scale(SpMatCoo<double> const& H, double extra, double tolerance) {
+        auto H_a = H.to_arma();
+        arma::vec eigval;
+        arma::eigs_sym(eigval, -H_a, 1, "lm", tolerance);
+        double eig_min = -std::real(eigval(0));
+        arma::eigs_sym(eigval, H_a, 1, "lm", tolerance);
+        double eig_max = std::real(eigval(0));
+        double slack = extra * (eig_max - eig_min);
+        return {eig_min-slack, eig_max+slack};
+    }
+    
+    template <>
+    EnergyScale energy_scale(SpMatCoo<cx_double> const& H, double extra, double tolerance) {
         auto H_a = H.to_arma();
         arma::cx_vec eigval;
         arma::eigs_gen(eigval, H_a, 1, "sr", tolerance);
@@ -206,61 +218,5 @@ namespace fkpm {
         double num_occ = density_product(gamma, std::bind(fermi_density, _1, kB_T, mu), es);
         double num_tot = density_product(gamma, [](double x){return 1;}, es);
         return num_occ/num_tot;
-    }
-    
-    // Random number from {+1, i, -1, -i}
-    arma::cx_double random_phase_cx(RNG& rng) {
-        std::uniform_int_distribution<uint32_t> dist4(0,3);
-        switch (dist4(rng)) {
-            case 0: return {+1,  0};
-            case 1: return { 0, +1};
-            case 2: return {-1,  0};
-            case 3: return { 0, -1};
-        }
-        assert(false);
-    }
-    
-    EngineCx::EngineCx(int n, int s): n(n), s(s) {
-        R = arma::cx_mat(n, s);
-        xi = arma::cx_mat(n, s);
-    }
-    
-    void EngineCx::set_R_uncorrelated(RNG& rng) {
-        double x = 1.0 / sqrt(R.n_cols);
-        for (int i = 0; i < R.n_rows; i++) {
-            for (int j = 0; j < R.n_cols; j++) {
-                R(i, j) = random_phase_cx(rng) * x;
-            }
-        }
-    }
-    
-    void EngineCx::set_R_correlated(Vec<int> const& grouping, RNG& rng) {
-        assert(R.n_rows == grouping.size());
-        R.fill(0.0);
-        for (int i = 0; i < R.n_rows; i++) {
-            int g = grouping[i];
-            assert(0 <= g && g < R.n_cols);
-            R(i, g) = random_phase_cx(rng);
-        }
-    }
-    
-    void EngineCx::set_R_identity() {
-        assert(R.n_rows == R.n_cols);
-        R.fill(0.0);
-        for (int i = 0; i < R.n_rows; i++) {
-            R(i, i) = 1.0;
-        }
-    }
-    
-    arma::cx_double EngineCx::stoch_element(int i, int j) {
-        return arma::cdot(R.row(j), xi.row(i)).real();
-    }
-    
-    std::shared_ptr<EngineCx> mk_engine_cx(int n, int s) {
-        std::shared_ptr<EngineCx> ret;
-        ret = mk_engine_cx_cuSPARSE(n, s);
-        if (ret == nullptr)
-            ret = mk_engine_cx_CPU(n, s);
-        return ret;
     }
 }

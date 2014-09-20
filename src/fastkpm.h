@@ -13,6 +13,7 @@
 #include <vector>
 #include <armadillo>
 #include <chrono>
+#include <cassert>
 
 
 namespace fkpm {
@@ -20,6 +21,8 @@ namespace fkpm {
     
     template <typename T>
     using Vec = std::vector<T>;
+    
+    typedef std::complex<double> cx_double;
     
     class Timer {
     public:
@@ -38,6 +41,8 @@ namespace fkpm {
         Vec<arma::uword> idx;
         Vec<T> val;
         SpMatCoo(int n_rows, int n_cols): n_rows(n_rows), n_cols(n_cols) {}
+        SpMatCoo(): SpMatCoo(0, 0) {}
+        
         void clear() {
             idx.resize(0);
             val.resize(0);
@@ -47,8 +52,17 @@ namespace fkpm {
             idx.push_back(j);
             val.push_back(v);
         }
+        SpMatCoo<T>& operator=(SpMatCoo<T> const& that) {
+            n_rows = that.n_rows;
+            n_cols = that.n_cols;
+            idx = that.idx;
+            val = that.val;
+            return *this;
+        }
         arma::SpMat<T> to_arma() const {
-            return arma::SpMat<T>(arma::umat(idx.data(), 2, idx.size()/2), arma::Col<T>(val), n_rows, n_cols);
+            auto locations = arma::umat(idx.data(), 2, idx.size()/2);
+            auto values = arma::Col<T>(val);
+            return arma::SpMat<T>(true, locations, values, n_rows, n_cols);
         }
     };
     
@@ -66,7 +80,7 @@ namespace fkpm {
     std::ostream& operator<< (std::ostream& stream, EnergyScale const& es);
     
     // Use Lanczos to bound eigenvalues of H, and determine appropriate rescaling
-    template<typename T>
+    template <typename T>
     EnergyScale energy_scale(SpMatCoo<T> const& H, double extend, double tolerance);
     
     
@@ -114,44 +128,52 @@ namespace fkpm {
     double mu_to_filling(Vec<double> const& gamma, EnergyScale const& es, double kB_T, double mu);
     
     
-    class EngineCx {
+    template <typename T>
+    class Engine {
     public:
-        int n;                 // Rows (columns) of Hamiltonian
-        int s;                 // Columns of random matrix
-        // TODO: hide?
         EnergyScale es;        // Scaling bounds
-        arma::cx_mat R;        // Random vectors
-        arma::cx_mat xi;       // Occupied orbitals
+        SpMatCoo<T> Hs;        // Scaled Hamiltonian
+        arma::Mat<T> R;        // Random vectors
+        arma::Mat<T> xi;       // Occupied orbitals
         
-        EngineCx(int n, int s);
+        // Uncorrelated random elements
+        void set_R_uncorrelated(int n, int s, RNG& rng);
         
-        // R has uncorrelated random elements
-        virtual void set_R_uncorrelated(RNG& rng);
+        // Correlated random elements with mostly orthogonal rows
+        void set_R_correlated(Vec<int> const& grouping, int s, RNG& rng);
         
-        // R has correlated random elements with mostly orthogonal rows
-        virtual void set_R_correlated(Vec<int> const& grouping, RNG& rng);
-        
-        // R is the identity matrix
-        virtual void set_R_identity();
+        // Identity matrix
+        void set_R_identity(int n);
         
         // Set Hamiltonian and energy scale
-        virtual void set_H(SpMatCoo<arma::cx_double> const& H, EnergyScale const& es) = 0;
+        void set_H(SpMatCoo<T> const& H, EnergyScale const& es);
         
-        // Chebyshev moments: mu_m = tr T_m(Hs) ~ <R| T_m(Hs) |R>
-        virtual Vec<double> moments(int M) = 0;
-        
-        // Stochastic orbital: xi = \sum_m c_m T_m(Hs) |R>
-        virtual void stoch_orbital(Vec<double> const& c) = 0;
-
         // Approximates B_{ij} ~ Re(xi R^\dagger)_{ij}.
         // Assumes stoch_orbital() has already been called.
-        arma::cx_double stoch_element(int i, int j);
+        T stoch_element(int i, int j);
+        
+        // Transfer R matrix to device
+        virtual void transfer_R();
+        
+        // Transfer H matrix to device
+        virtual void transfer_H();
+        
+        // Chebyshev moments: mu_m = tr T_m(Hs) ~ <R| T_m(Hs) |R>
+        virtual Vec<double> moments(int M);
+        
+        // Stochastic orbital: xi = \sum_m c_m T_m(Hs) |R>
+        virtual void stoch_orbital(Vec<double> const& c);
     };
     
-    std::shared_ptr<EngineCx> mk_engine_cx_CPU(int n, int s);
-    std::shared_ptr<EngineCx> mk_engine_cx_cuSPARSE(int n, int s);
+    // CuSparse
+    template <typename T>
+    std::shared_ptr<Engine<T>> mk_engine_cuSPARSE();
+    
     // Fastest EngineCx available
-    std::shared_ptr<EngineCx> mk_engine_cx(int n, int s);
+    template <typename T>
+    std::shared_ptr<Engine<T>> mk_engine();
+    std::shared_ptr<Engine<double>> mk_engine_re();
+    std::shared_ptr<Engine<cx_double>> mk_engine_cx();
 }
 
 #endif /* defined(__tibidy__fastkpm__) */
