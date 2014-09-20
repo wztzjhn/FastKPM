@@ -28,6 +28,7 @@ namespace fkpm {
     
     template <typename T>
     void Engine<T>::set_R_uncorrelated(int n, int s, RNG& rng) {
+        xi.set_size(n, s);
         R.set_size(n, s);
         double x = 1.0 / sqrt(s);
         for (int i = 0; i < n; i++) {
@@ -41,6 +42,7 @@ namespace fkpm {
     template <typename T>
     void Engine<T>::set_R_correlated(Vec<int> const& grouping, int s, RNG& rng) {
         int n = grouping.size();
+        xi.set_size(n, s);
         R.set_size(n, s);
         R.fill(0.0);
         for (int i = 0; i < n; i++) {
@@ -53,6 +55,7 @@ namespace fkpm {
     
     template <typename T>
     void Engine<T>::set_R_identity(int n) {
+        xi.set_size(n, n);
         R.set_size(n, n);
         R.fill(0.0);
         for (int i = 0; i < n; i++) {
@@ -113,13 +116,11 @@ namespace fkpm {
         
         arma::SpMat<T> Hs_a = Hs.to_arma();
         int n = R.n_rows;
-        int s = R.n_cols;
         assert(Hs.n_rows == n && Hs.n_cols == n);
         
         arma::Mat<T> a0 = R;
         arma::Mat<T> a1 = Hs_a * R;
         
-        xi.set_size(n, s);
         xi = c[0]*a0 + c[1]*a1;
         for (int m = 2; m < M; m++) {
             arma::Mat<T> a2 = 2*Hs_a*a1 - a0;

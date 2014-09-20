@@ -22,7 +22,9 @@ namespace fkpm {
     template <typename T>
     using Vec = std::vector<T>;
     
+    typedef arma::uword          uword;
     typedef std::complex<double> cx_double;
+    typedef std::complex<float>  cx_float;
     
     class Timer {
     public:
@@ -38,11 +40,13 @@ namespace fkpm {
     class SpMatCoo {
     public:
         int n_rows, n_cols;
-        Vec<arma::uword> idx;
+        Vec<uword> idx;
         Vec<T> val;
         SpMatCoo(int n_rows, int n_cols): n_rows(n_rows), n_cols(n_cols) {}
         SpMatCoo(): SpMatCoo(0, 0) {}
-        
+        int size() {
+            return idx.size()/2;
+        }
         void clear() {
             idx.resize(0);
             val.resize(0);
