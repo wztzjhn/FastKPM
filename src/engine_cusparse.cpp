@@ -95,17 +95,17 @@ namespace fkpm {
         
         void transfer_R() {
             TRY(cudaSetDevice(device));
-
+            
             R_sz = R.size()*sizeof(cx_float);
             
             if (R_sz > R_cp) {
                 R_cp = R_sz;
                 
-                TRY(cudaFree(&a0_d));
-                TRY(cudaFree(&a1_d));
-                TRY(cudaFree(&a2_d));
-                TRY(cudaFree(&R_d));
-                TRY(cudaFree(&xi_d));
+                TRY(cudaFree(a0_d));
+                TRY(cudaFree(a1_d));
+                TRY(cudaFree(a2_d));
+                TRY(cudaFree(R_d));
+                TRY(cudaFree(xi_d));
                 
                 TRY(cudaMalloc(&a0_d, R_cp));
                 TRY(cudaMalloc(&a1_d, R_cp));
