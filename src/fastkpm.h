@@ -1,13 +1,5 @@
-//
-//  fastkpm.h
-//  tibidy
-//
-//  Created by Kipton Barros on 5/22/14.
-//
-//
-
-#ifndef __tibidy__fastkpm__
-#define __tibidy__fastkpm__
+#ifndef __fastkpm__
+#define __fastkpm__
 
 #include <random>
 #include <vector>
@@ -179,4 +171,4 @@ namespace fkpm {
     std::shared_ptr<Engine<cx_double>> mk_engine_cx();
 }
 
-#endif /* defined(__tibidy__fastkpm__) */
+#endif /* defined(__fastkpm__) */
