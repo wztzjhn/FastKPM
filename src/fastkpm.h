@@ -60,6 +60,9 @@ namespace fkpm {
             auto values = arma::Col<T>(val);
             return arma::SpMat<T>(true, locations, values, n_rows, n_cols);
         }
+        arma::Mat<T> to_arma_dense() const {
+            return arma::eye<arma::Mat<T>>(n_rows, n_rows) * to_arma();
+        }
     };
     
     // Scale eigenvalues within range (-1, +1)
@@ -109,18 +112,21 @@ namespace fkpm {
     // Fermi function at x
     double fermi_density(double x, double kB_T, double mu);
     
-    // "Grand" (fixed mu) free energy at fixed chemical potential mu
-    // To get canonical (fixed filling) free energy, add term (mu N_electrons)
-    double electronic_grand_energy(Vec<double> const& gamma, EnergyScale const& es, double kB_T, double mu);
-    
-    // Zero temperature energy at at fixed filling fraction
-    double electronic_energy_exact(arma::vec evals, double filling);
-    
-    // Find chemical potential mu corresponding to given filling fraction (+- delta_filling)
-    double filling_to_mu(Vec<double> const& gamma, EnergyScale const& es, double kB_T, double filling, double delta_filling);
-    
-    // Find filling fraction corresponding to chemical potential
+    // Filling fraction corresponding to chemical potential
     double mu_to_filling(Vec<double> const& gamma, EnergyScale const& es, double kB_T, double mu);
+    double mu_to_filling(arma::vec const& evals, double kB_T, double mu);
+    
+    // Chemical potential mu corresponding to given filling fraction (+- delta_filling)
+    double filling_to_mu(Vec<double> const& gamma, EnergyScale const& es, double kB_T, double filling, double delta_filling);
+    double filling_to_mu(arma::vec const& evals, double kB_T, double filling);
+    
+    // "Grand" free energy at fixed chemical potential mu
+    double electronic_grand_energy(Vec<double> const& gamma, EnergyScale const& es, double kB_T, double mu);
+    double electronic_grand_energy(arma::vec const& evals, double kB_T, double mu);
+    
+    // "Canonical" free energy at fixed filling fraction
+    double electronic_energy(Vec<double> const& gamma, EnergyScale const& es, double kB_T, double filling, double delta_filling);
+    double electronic_energy(arma::vec const& evals, double kB_T, double filling);
     
     
     template <typename T>
