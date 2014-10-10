@@ -80,7 +80,7 @@ namespace fkpm {
     
     template <typename T>
     T Engine<T>::stoch_element(int i, int j) {
-        return std::real(arma::cdot(R.row(j), xi.row(i)));
+        return arma::cdot(R.row(j), xi.row(i));
     }
     
     template <typename T>

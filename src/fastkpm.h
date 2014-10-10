@@ -149,7 +149,7 @@ namespace fkpm {
         // Set Hamiltonian and energy scale
         void set_H(SpMatCoo<T> const& H, EnergyScale const& es);
         
-        // Approximates B_{ij} ~ Re(xi R^\dagger)_{ij}.
+        // Approximates B_{ij} ~ (xi R^\dagger)_{ij} where xi = B R
         // Assumes stoch_orbital() has already been called.
         T stoch_element(int i, int j);
         
@@ -159,10 +159,10 @@ namespace fkpm {
         // Transfer H matrix to device
         virtual void transfer_H();
         
-        // Chebyshev moments: mu_m = tr T_m(Hs) ~ <R| T_m(Hs) |R>
+        // Chebyshev moments: mu_m = tr T_m(Hs) ~ tr R^\dagger T_m(Hs) R
         virtual Vec<double> moments(int M);
         
-        // Stochastic orbital: xi = \sum_m c_m T_m(Hs) |R>
+        // Stochastic orbital: xi = B R ~ \sum_m c_m T_m(Hs) R
         virtual void stoch_orbital(Vec<double> const& c);
     };
     
