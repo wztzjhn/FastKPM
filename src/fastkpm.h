@@ -125,7 +125,8 @@ namespace fkpm {
     double electronic_grand_energy(arma::vec const& evals, double kB_T, double mu);
     
     // "Canonical" free energy at fixed filling fraction
-    double electronic_energy(Vec<double> const& gamma, EnergyScale const& es, double kB_T, double filling, double delta_filling);
+    // mu should have been obtained from filling_to_mu() function
+    double electronic_energy(Vec<double> const& gamma, EnergyScale const& es, double kB_T, double filling, double mu);
     double electronic_energy(arma::vec const& evals, double kB_T, double filling);
     
     

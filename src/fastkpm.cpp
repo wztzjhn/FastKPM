@@ -187,16 +187,18 @@ namespace fkpm {
     // TODO: use modified newton method at finite temperature.
     double filling_to_mu(Vec<double> const& gamma, EnergyScale const& es, double kB_T, double filling, double delta_filling) {
         assert(kB_T == 0);
+        assert(gamma.size() >= 3);
+        assert(0 <= filling && filling <= 1.0);
+        assert(delta_filling >= 0);
         Vec<double> x, irho;
         integrated_density_function(gamma, es, x, irho);
         double n_tot = density_product(gamma, [](double x){return 1;}, es);
-        assert(0 <= filling && filling <= 1.0);
         double n1 = n_tot * std::max(filling - delta_filling, 0.0);
-        double n2 = n_tot * std::min(filling + delta_filling, n_tot);
+        double n2 = n_tot * std::min(filling + delta_filling, 1.0);
         int i1 = std::find_if(irho.begin(), irho.end(), [&](double x){return x > n1;}) - irho.begin();
         int i2 = std::find_if(irho.begin(), irho.end(), [&](double x){return x > n2;}) - irho.begin();
-        assert(0 <= i1 && i1 <= irho.size()-1);
-        assert(0 <= i2 && i2 <= irho.size()-1);
+        i1 = std::min<int>(std::max(i1, 1), irho.size()-1);
+        i2 = std::min<int>(std::max(i2, 1), irho.size()-1);
         return (x[i1] + x[i1-1] + x[i2] + x[i2-1]) / 4.0;
     }
     double filling_to_mu(arma::vec const& evals, double kB_T, double filling) {
@@ -221,10 +223,9 @@ namespace fkpm {
         return acc;
     }
     
-    double electronic_energy(Vec<double> const& gamma, EnergyScale const& es, double kB_T, double filling, double delta_filling) {
+    double electronic_energy(Vec<double> const& gamma, EnergyScale const& es, double kB_T, double filling, double mu) {
         double n_tot = density_product(gamma, [](double x){return 1;}, es);
         double n_occ = filling*n_tot;
-        double mu = filling_to_mu(gamma, es, kB_T, filling, delta_filling);
         return electronic_grand_energy(gamma, es, kB_T, mu) + mu*n_occ;
     }
     double electronic_energy(arma::vec const& evals, double kB_T, double filling) {
