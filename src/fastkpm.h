@@ -150,7 +150,8 @@ namespace fkpm {
         // Set Hamiltonian and energy scale
         void set_H(SpMatCoo<T> const& H, EnergyScale const& es);
         
-        // Approximates B_{ij} ~ (xi R^\dagger)_{ij} where xi = B R
+        // Approximates B ~ (xi R^\dagger + R xi^\dagger)/2 where xi = B R
+        // and B=B^\dagger.
         // Assumes stoch_orbital() has already been called.
         T stoch_element(int i, int j);
         
