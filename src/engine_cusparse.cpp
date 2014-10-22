@@ -124,7 +124,7 @@ namespace fkpm {
 
             // TODO : perform COO to CSR conversion on device!
             int n = Hs.n_rows;
-            auto Hs_a = Hs.to_arma();
+            arma::sp_cx_mat Hs_a = Hs.to_arma().st();
             n_nonzero = Hs_a.n_nonzero;
             Hs_trace = std::real(arma::trace(Hs_a));
             
