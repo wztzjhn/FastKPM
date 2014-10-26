@@ -42,14 +42,16 @@ namespace fkpm {
     }
     
     template <typename T>
-    void Engine<T>::set_R_correlated(Vec<int> const& grouping, int s, RNG& rng) {
-        int n = grouping.size();
+    void Engine<T>::set_R_correlated(Vec<int> const& groups, RNG& rng) {
+        auto minmax = std::minmax_element(groups.begin(), groups.end());
+        assert(*minmax.first == 0);
+        int s = *minmax.second + 1;
+        int n = groups.size();
         xi.set_size(n, s);
         R.set_size(n, s);
         R.fill(0.0);
         for (int i = 0; i < n; i++) {
-            int g = grouping[i];
-            assert(0 <= g && g < s);
+            int g = groups[i];
             R(i, g) = random_phase<T>(rng);
         }
         transfer_R();
@@ -133,6 +135,57 @@ namespace fkpm {
             a1 = a2;
         }
     }
+    
+    /*
+    template <typename T>
+    void Engine<T>::stoch_orbital(Vec<double> const& c) {
+        int M = c.size();
+        
+        val a2 = dense(n, nrand)
+        val (mu, a0, a1) = momentsStochasticAux(order, r)
+        
+        val b2 = dense(n, nrand)
+        val b1 = dense(n, nrand)
+        val b0 = r * c(order - 1)
+        
+        // need special logic since (mu_1) is calculated exactly
+        for (i <- 0 until grad.numRows) { grad(i, i) += c(1) }
+        def cp(m: Int): R = if (m == 1) 0 else c(m)
+            
+            // cache defined indices for speed
+            val (indicesI, indicesJ) = {
+                val (i, j) = grad.definedIndices.unzip
+                (i.toArray, j.toArray)
+            }
+        
+        for (m <- order-2 to 0 by -1) {
+            // a0 = alpha_{m}
+            // b0 = beta_{m}
+            
+            if (nrand > 1) {
+                for ((i, j) <- grad.definedIndices; k <- 0 until nrand) {
+                    grad(i, j) += (if (m == 0) 1 else 2) * b0(i, k).conj * a0(j, k) / nrand
+                }
+            }
+            // equivalent to above, but much faster. b2 is used as a temporary vector.
+            else {
+                if (m == 0) (b2 := b0) else (b2 :=* (2, b0))
+                    for (iter <- 0 until indicesI.length) {
+                        grad.scalar.maddTo(true, b2.data, indicesI(iter), a0.data, indicesJ(iter), grad.data, iter)
+                    }
+            }
+            
+            a2 := a1
+            b2 := b1
+            a1 := a0
+            b1 := b0
+            a0 := a2; a0.gemm(2, H, a1, -1)                   // a0 = 2 H a1 - a2 
+            b0 :=* (cp(m), r); b0.gemm(2, H, b1, 1); b0 -= b2 // b0 = c(m) r + 2 H b1 - b2
+        }
+        
+        (c, mu).zipped.map(_*_).sum
+    }
+*/
     
     template class Engine<double>;
     template class Engine<cx_double>;

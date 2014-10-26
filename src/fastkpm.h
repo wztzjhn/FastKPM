@@ -142,7 +142,7 @@ namespace fkpm {
         void set_R_uncorrelated(int n, int s, RNG& rng);
         
         // Correlated random elements with mostly orthogonal rows
-        void set_R_correlated(Vec<int> const& grouping, int s, RNG& rng);
+        void set_R_correlated(Vec<int> const& groups, RNG& rng);
         
         // Identity matrix
         void set_R_identity(int n);
