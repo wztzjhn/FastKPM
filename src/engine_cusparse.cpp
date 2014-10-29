@@ -251,7 +251,7 @@ namespace fkpm {
     }
     template <>
     std::shared_ptr<Engine<double>> mk_engine_cuSPARSE() {
-        std::cerr << "Real KPM not yet implemented for real values!\n";
+        std::cerr << "cuSPARSE engine not yet implemented for type `double`!\n";
         return nullptr; // not yet implemented
     }
     template std::shared_ptr<Engine<cx_double>> mk_engine_cuSPARSE();

@@ -22,14 +22,18 @@ namespace fkpm {
         return stream << "< lo = " << es.lo << " hi = " << es.hi << " >\n";
     }
     
+    // TODO: fix Armadillo's eigs_sym
     template <>
     EnergyScale energy_scale(SpMatCoo<double> const& H, double extra, double tolerance) {
-        auto H_a = H.to_arma();
-        arma::vec eigval;
-        arma::eigs_sym(eigval, -H_a, 1, "lm", tolerance);
-        double eig_min = -std::real(eigval(0));
-        arma::eigs_sym(eigval, H_a, 1, "lm", tolerance);
-        double eig_max = std::real(eigval(0));
+        arma::sp_mat H_a_re = H.to_arma();
+        arma::sp_mat H_a_im = H_a_re;
+        H_a_im.zeros();
+        arma::sp_cx_mat H_a(H_a_re, H_a_im);
+        arma::cx_vec eigval;
+        arma::eigs_gen(eigval, H_a, 1, "sr", tolerance);
+        double eig_min = eigval(0).real();
+        arma::eigs_gen(eigval, H_a, 1, "lr", tolerance);
+        double eig_max = eigval(0).real();
         double slack = extra * (eig_max - eig_min);
         return {eig_min-slack, eig_max+slack};
     }
