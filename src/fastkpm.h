@@ -166,6 +166,8 @@ namespace fkpm {
         
         // Stochastic orbital: xi = B R ~ \sum_m c_m T_m(Hs) R
         virtual void stoch_orbital(Vec<double> const& c);
+
+        virtual arma::SpMat<T> autodiff(Vec<double> const& c);
     };
     
     // CuSPARSE engine
