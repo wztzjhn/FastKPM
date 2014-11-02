@@ -128,8 +128,8 @@ namespace fkpm {
             n_nonzero = Hs_a.n_nonzero;
             Hs_trace = std::real(arma::trace(Hs_a));
             
-            HRowPtr_sz   = (n+1)*sizeof(uword);
-            HColIndex_sz = n_nonzero*sizeof(uword);
+            HRowPtr_sz   = (n+1)*sizeof(int);
+            HColIndex_sz = n_nonzero*sizeof(int);
             HVal_sz      = n_nonzero*sizeof(cx_float);
             
             if (HRowPtr_sz > HRowPtr_cp || HColIndex_sz > HColIndex_cp || HVal_sz > HVal_cp) {
