@@ -97,9 +97,9 @@ namespace fkpm {
             if (this == &that) return;
             this->n_rows = that.n_rows;
             this->n_cols = that.n_cols;
-            this->row_idx.resize(that.size);
-            this->col_idx.resize(that.size);
-            this->val.resize(that.size);
+            this->row_idx.resize(that.size());
+            this->col_idx.resize(that.size());
+            this->val.resize(that.size());
             row_ptr.resize(this->n_rows+1);
             sorted_ptrs.resize(that.size());
             for (int p = 0; p < this->size(); p++) {
@@ -112,19 +112,32 @@ namespace fkpm {
                 int j2 = that.col_idx[p2];
                 return (i1 < i2 || (i1 == i2 && j1 < j2));
             });
-            int max_row_ptr = -1;
-            for (int k = 0; k < this->size(); k++) {
-                int p = sorted_ptrs[k];
-                this->row_idx[k] = that.row_idx[p];
-                this->col_idx[k] = that.col_idx[p];
-                this->val[k] = that.val[p];
-                while (max_row_ptr < this->row_idx[k]) {
-                    this->row_ptr[++max_row_ptr] = k;
+            int max_row = -1; // largest row observed
+            int k = 0;        // number of unique elements observed
+            for (int p : sorted_ptrs) {
+                int i = that.row_idx[p];
+                int j = that.col_idx[p];
+                // if element already exists, accumulate previous value
+                if (k > 0 && this->row_idx[k-1] == i && this->col_idx[k-1] == j) {
+                    this->val[k-1] += that.val[p];
+                }
+                // otherwise update and increment all fields
+                else {
+                    this->row_idx[k] = i;
+                    this->col_idx[k] = j;
+                    this->val[k] = that.val[p];
+                    while (max_row < i) {
+                        this->row_ptr[++max_row] = k;
+                    }
+                    k++;
                 }
             }
-            while (max_row_ptr < this->n_rows) {
-                this->row_ptr[++max_row_ptr] = this->size;
+            while (max_row < this->n_rows) {
+                this->row_ptr[++max_row] = k;
             }
+            this->row_idx.resize(k);
+            this->col_idx.resize(k);
+            this->val.resize(k);
         }
     };
     

@@ -136,9 +136,6 @@ namespace fkpm {
         }
     }
     
-//    template <typename T>
-//    arma::sp_cx_mat Engine<T>::autodiff(Vec<double> const& c) { abort(); }
-    
     template <typename T>
     arma::SpMat<T> Engine<T>::autodiff(Vec<double> const& c) {
         int M = c.size();
