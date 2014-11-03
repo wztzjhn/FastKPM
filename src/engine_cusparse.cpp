@@ -41,14 +41,10 @@ namespace fkpm {
     void outer_product(int n_rows, int n_cols, float alpha, cuFloatComplex *A, cuFloatComplex *B,
                        int D_nnz, int *D_row_idx, int *D_col_idx, cuFloatComplex *D_val);
     
-    void double_to_float(double *src, int n, float *dst) {
+    template <typename S, typename T>
+    void convert_array(S const* src, int n, T* dst) {
         for (int i = 0; i < n; i++)
-            dst[i] = (float)src[i];
-    }
-    
-    void float_to_double(float *src, int n, double *dst) {
-        for (int i = 0; i < n; i++)
-            dst[i] = (double)src[i];
+            dst[i] = (T)src[i];
     }
     
     template <typename T>
@@ -118,7 +114,7 @@ namespace fkpm {
             }
             
             flt_store.resize(2*R.size());
-            double_to_float((double *)R.memptr(), flt_store.size(), flt_store.data());
+            convert_array((double *)R.memptr(), flt_store.size(), flt_store.data());
             TRY(cudaMemcpy(R_d, flt_store.data(), R_sz, cudaMemcpyHostToDevice));
         }
         
@@ -150,7 +146,7 @@ namespace fkpm {
             }
             
             flt_store.resize(2*n_nonzero);
-            double_to_float((double *)Hs.val.data(), flt_store.size(), flt_store.data());
+            convert_array((double *)Hs.val.data(), flt_store.size(), flt_store.data());
             TRY(cudaMemcpy(HRowPtr_d,   Hs.row_ptr.data(), HRowPtr_sz,   cudaMemcpyHostToDevice));
             TRY(cudaMemcpy(HColIndex_d, Hs.col_idx.data(), HColIndex_sz, cudaMemcpyHostToDevice));
             TRY(cudaMemcpy(HVal_d,      flt_store.data(),  HVal_sz,      cudaMemcpyHostToDevice));
@@ -243,7 +239,7 @@ namespace fkpm {
             int n = R.n_rows;
             int s = R.n_cols;
             arma::Mat<cx_double> xi(n, s);
-            float_to_double(temp.data(), temp.size(), (double *)xi.memptr());
+            convert_array(temp.data(), temp.size(), (double *)xi.memptr());
             for (int k = 0; k < D.size(); k++) {
                 int i = D.row_idx[k];
                 int j = D.col_idx[k];
