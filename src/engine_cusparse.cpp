@@ -122,13 +122,13 @@ namespace fkpm {
         void transfer_H() {
             TRY(cudaSetDevice(device));
 
-            // TODO : remove useless Arma conversion
-            int n = Hs.n_rows;
-            arma::sp_cx_mat Hs_a = Hs.to_arma().st();
-            n_nonzero = Hs_a.n_nonzero;
-            Hs_trace = std::real(arma::trace(Hs_a));
+            n_nonzero = Hs.size();
+            Hs_trace = 0;
+            for (int i = 0; i < Hs.n_rows; i++) {
+                Hs_trace += std::real(Hs(i, i));
+            }
             
-            HRowPtr_sz   = (n+1)*sizeof(int);
+            HRowPtr_sz   = (Hs.n_rows+1)*sizeof(int);
             HColIndex_sz = n_nonzero*sizeof(int);
             HVal_sz      = n_nonzero*sizeof(cx_float);
             
@@ -147,10 +147,10 @@ namespace fkpm {
             }
             
             flt_store.resize(2*n_nonzero);
-            double_to_float((double *)Hs_a.values, flt_store.size(), flt_store.data());
-            TRY(cudaMemcpy(HRowPtr_d,   Hs_a.col_ptrs,    HRowPtr_sz,   cudaMemcpyHostToDevice));
-            TRY(cudaMemcpy(HColIndex_d, Hs_a.row_indices, HColIndex_sz, cudaMemcpyHostToDevice));
-            TRY(cudaMemcpy(HVal_d,      flt_store.data(), HVal_sz,      cudaMemcpyHostToDevice));
+            double_to_float((double *)Hs.val.data(), flt_store.size(), flt_store.data());
+            TRY(cudaMemcpy(HRowPtr_d,   Hs.row_ptr.data(), HRowPtr_sz,   cudaMemcpyHostToDevice));
+            TRY(cudaMemcpy(HColIndex_d, Hs.col_idx.data(), HColIndex_sz, cudaMemcpyHostToDevice));
+            TRY(cudaMemcpy(HVal_d,      flt_store.data(),  HVal_sz,      cudaMemcpyHostToDevice));
         }
         
         // C = alpha H B + beta C
