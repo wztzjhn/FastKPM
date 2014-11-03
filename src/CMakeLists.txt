@@ -10,7 +10,11 @@ set(KPM_INCLUDE
   fastkpm.h
 )
 
-add_library(fastkpm SHARED ${KPM_SRC})
+if (CUDA_FOUND)
+  cuda_add_library(fastkpm SHARED outer_product.cu ${KPM_SRC})
+else()
+  add_library(fastkpm SHARED ${KPM_SRC})
+endif()
 target_link_libraries(fastkpm ${LIBS})
 
 set_target_properties(fastkpm PROPERTIES PUBLIC_HEADER "${KPM_INCLUDE}")

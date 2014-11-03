@@ -36,7 +36,10 @@ namespace fkpm {
       } \
     };
 
+
 namespace fkpm {
+    void outer_product(int n_rows, int n_cols, cuFloatComplex *a, cuFloatComplex *b, float scal,
+                       int D_nnz, int *D_row_idx, int *D_col_idx, cuFloatComplex *D_val);
     
     void double_to_float(double *src, int n, float *dst) {
         for (int i = 0; i < n; i++)
@@ -228,6 +231,15 @@ namespace fkpm {
             cudaMemcpy(temp.data(), xi_d, R_sz, cudaMemcpyDeviceToHost);
             
             // TODO: replace with kernel call
+            /*
+            int D_nnz = 0;
+            int *D_row_idx = nullptr;
+            int *D_col_idx = nullptr;
+            cuFloatComplex *D_val = nullptr;
+            outer_product(R.n_rows, R.n_cols, (cuFloatComplex *)R_d, (cuFloatComplex *)xi_d, 0.5,
+                          D_nnz, D_row_idx, D_col_idx, D_val);
+            */
+            
             int n = R.n_rows;
             int s = R.n_cols;
             arma::Mat<cx_double> xi(n, s);

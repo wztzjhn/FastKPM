@@ -65,6 +65,8 @@ if (CUDA_FOUND)
     include_directories(SYSTEM ${CUDA_INCLUDE_DIRS})
     set(LIBS ${LIBS} ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES} ${CUDA_cusparse_LIBRARY})
     add_definitions(-DWITH_CUDA)
+    set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-gencode arch=compute_20,code=sm_20)
+    set(CUDA_PROPAGATE_HOST_FLAGS OFF)
 endif()
 
 if (WITH_MPI)
