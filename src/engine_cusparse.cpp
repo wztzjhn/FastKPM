@@ -196,7 +196,7 @@ namespace fkpm {
             return mu;
         }
         
-        void stoch_orbital(Vec<double> const& c) {
+        void stoch_matrix(Vec<double> const& c, SpMatCsr<cx_double>& D) {
             TRY(cudaSetDevice(device));
             
             assert(Hs.n_rows == R.n_rows && Hs.n_cols == R.n_rows);
@@ -226,7 +226,19 @@ namespace fkpm {
             
             Vec<float> temp(2*R.size());
             cudaMemcpy(temp.data(), xi_d, R_sz, cudaMemcpyDeviceToHost);
+            
+            // TODO: replace with kernel call
+            int n = R.n_rows;
+            int s = R.n_cols;
+            arma::Mat<cx_double> xi(n, s);
             float_to_double(temp.data(), temp.size(), (double *)xi.memptr());
+            for (int k = 0; k < D.size(); k++) {
+                int i = D.row_idx[k];
+                int j = D.col_idx[k];
+                cx_double x1 = arma::cdot(R.row(j), xi.row(i)); // xi R^dagger
+                cx_double x2 = arma::cdot(xi.row(j), R.row(i)); // R xi^dagger
+                D.val[k] = 0.5*(x1+x2);
+            }
         }
     };
     

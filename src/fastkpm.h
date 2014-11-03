@@ -97,9 +97,8 @@ namespace fkpm {
     class Engine {
     public:
         EnergyScale es;        // Scaling bounds
-        SpMatCoo<T> Hs;        // Scaled Hamiltonian
+        SpMatCsr<T> Hs;        // Scaled Hamiltonian
         arma::Mat<T> R;        // Random vectors
-        arma::Mat<T> xi;       // Occupied orbitals
         
         // Uncorrelated random elements
         void set_R_uncorrelated(int n, int s, RNG& rng);
@@ -113,11 +112,6 @@ namespace fkpm {
         // Set Hamiltonian and energy scale
         void set_H(SpMatCoo<T> const& H, EnergyScale const& es);
         
-        // Approximates B ~ (xi R^\dagger + R xi^\dagger)/2 where xi = B R
-        // and B=B^\dagger.
-        // Assumes stoch_orbital() has already been called.
-        T stoch_element(int i, int j);
-        
         // Transfer R matrix to device
         virtual void transfer_R();
         
@@ -127,10 +121,15 @@ namespace fkpm {
         // Chebyshev moments: mu_m = tr T_m(Hs) ~ tr R^\dagger T_m(Hs) R
         virtual Vec<double> moments(int M);
         
-        // Stochastic orbital: xi = B R ~ \sum_m c_m T_m(Hs) R
-        virtual void stoch_orbital(Vec<double> const& c);
-
-        virtual arma::SpMat<T> autodiff(Vec<double> const& c);
+        // Approximates D ~ (xi R^\dagger + R xi^\dagger)/2 where xi = D R
+        // and D ~ (\sum_m c_m T_m(Hs))R
+        virtual void stoch_matrix(Vec<double> const& c, SpMatCsr<T>& D);
+        
+        // Approximates D ~ (d/dH^T) tr g where tr g ~ tr R^\dagger g R,
+        // g~\sum_m c_m T_m(Hs) and coefficients c_m chosen such that
+        // dg(x)/dx = D(x).
+        // REQUIREMENT: moments() must have been called previously.
+        virtual void autodiff_matrix(Vec<double> const& c, SpMatCsr<T>& D);
     };
     
     // CuSPARSE engine

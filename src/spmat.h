@@ -51,7 +51,7 @@ namespace fkpm {
             return arma::eye<arma::Mat<T>>(n_rows, n_rows) * to_arma();
         }
     };
-
+    
     // Sparse matrix in Compressed Sparse Row format
     template <typename T>
     class SpMatCsr : public SpMatCoo<T> {
@@ -59,6 +59,7 @@ namespace fkpm {
         Vec<int> row_ptr;
         Vec<int> sorted_ptrs;
         SpMatCsr(): SpMatCoo<T>(0, 0) {}
+        SpMatCsr(SpMatCoo<T> const& that) { build(that); }
         void clear() {
             SpMatCoo<T>::clear();
             row_ptr.resize(0);
