@@ -24,7 +24,7 @@ namespace fkpm {
     
     // TODO: fix Armadillo's eigs_sym
     template <>
-    EnergyScale energy_scale(SpMatCoo<double> const& H, double extra, double tolerance) {
+    EnergyScale energy_scale(SpMatCsr<double> const& H, double extra, double tolerance) {
         arma::sp_mat H_a_re = H.to_arma();
         arma::sp_mat H_a_im = H_a_re;
         H_a_im.zeros();
@@ -39,7 +39,7 @@ namespace fkpm {
     }
     
     template <>
-    EnergyScale energy_scale(SpMatCoo<cx_double> const& H, double extra, double tolerance) {
+    EnergyScale energy_scale(SpMatCsr<cx_double> const& H, double extra, double tolerance) {
         auto H_a = H.to_arma();
         arma::cx_vec eigval;
         arma::eigs_gen(eigval, H_a, 1, "sr", tolerance);

@@ -42,8 +42,7 @@ namespace fkpm {
     
     // Use Lanczos to bound eigenvalues of H, and determine appropriate rescaling
     template <typename T>
-    EnergyScale energy_scale(SpMatCoo<T> const& H, double extend, double tolerance);
-    
+    EnergyScale energy_scale(SpMatCsr<T> const& H, double extend, double tolerance);
     
     // Used to damp Gibbs oscillations in KPM estimates
     Vec<double> jackson_kernel(int M);
@@ -110,7 +109,7 @@ namespace fkpm {
         void set_R_identity(int n);
         
         // Set Hamiltonian and energy scale
-        void set_H(SpMatCoo<T> const& H, EnergyScale const& es);
+        void set_H(SpMatCsr<T> const& H, EnergyScale const& es);
         
         // Transfer R matrix to device
         virtual void transfer_R() {}

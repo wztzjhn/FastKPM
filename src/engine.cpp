@@ -66,10 +66,10 @@ namespace fkpm {
     }
     
     template <typename T>
-    void Engine<T>::set_H(SpMatCoo<T> const& H, EnergyScale const& es) {
+    void Engine<T>::set_H(SpMatCsr<T> const& H, EnergyScale const& es) {
         assert(H.n_rows == H.n_cols);
         this->es = es;
-        Hs.build(H);
+        this->Hs = H;
         for (int i = 0; i < Hs.n_rows; i++) {
             Hs(i, i) -= es.avg();
         }

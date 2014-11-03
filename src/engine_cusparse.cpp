@@ -68,7 +68,7 @@ namespace fkpm {
         void *HColIndex_d=0, *HRowPtr_d=0, *HVal_d=0;
         
         
-        Engine_cuSPARSE(int device): Engine<cx_double>() {
+        Engine_cuSPARSE(int device) {
             this->device = device;
             TRY(cudaSetDevice(device));
             
@@ -122,7 +122,7 @@ namespace fkpm {
         void transfer_H() {
             TRY(cudaSetDevice(device));
 
-            // TODO : perform COO to CSR conversion on device!
+            // TODO : remove useless Arma conversion
             int n = Hs.n_rows;
             arma::sp_cx_mat Hs_a = Hs.to_arma().st();
             n_nonzero = Hs_a.n_nonzero;
