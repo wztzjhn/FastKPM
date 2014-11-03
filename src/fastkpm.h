@@ -113,25 +113,29 @@ namespace fkpm {
         void set_H(SpMatCoo<T> const& H, EnergyScale const& es);
         
         // Transfer R matrix to device
-        virtual void transfer_R();
+        virtual void transfer_R() {}
         
         // Transfer H matrix to device
-        virtual void transfer_H();
+        virtual void transfer_H() {}
         
         // Chebyshev moments: mu_m = tr T_m(Hs) ~ tr R^\dagger T_m(Hs) R
-        virtual Vec<double> moments(int M);
+        virtual Vec<double> moments(int M) = 0;
         
         // Approximates D ~ (xi R^\dagger + R xi^\dagger)/2 where xi = D R
         // and D ~ (\sum_m c_m T_m(Hs))R
-        virtual void stoch_matrix(Vec<double> const& c, SpMatCsr<T>& D);
+        virtual void stoch_matrix(Vec<double> const& c, SpMatCsr<T>& D) = 0;
         
         // Approximates D ~ (d/dH^T) tr g where tr g ~ tr R^\dagger g R,
         // g~\sum_m c_m T_m(Hs) and coefficients c_m chosen such that
         // dg(x)/dx = D(x).
         // REQUIREMENT: moments() must have been called previously.
-        virtual void autodiff_matrix(Vec<double> const& c, SpMatCsr<T>& D);
+        virtual void autodiff_matrix(Vec<double> const& c, SpMatCsr<T>& D) = 0;
     };
     
+    // CPU engine
+    template <typename T>
+    std::shared_ptr<Engine<T>> mk_engine_cpu();
+
     // CuSPARSE engine
     template <typename T>
     std::shared_ptr<Engine<T>> mk_engine_cuSPARSE();

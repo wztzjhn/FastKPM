@@ -240,6 +240,56 @@ namespace fkpm {
                 D.val[k] = 0.5*(x1+x2);
             }
         }
+        
+        void autodiff_matrix(Vec<double> const& c, SpMatCsr<cx_double>& D) {
+            int M = c.size();
+            arma::SpMat<cx_double> Hs_a = this->Hs.to_arma();
+            int n = this->R.n_rows;
+            int s = this->R.n_cols;
+            
+            // forward calculation
+            
+            arma::Mat<cx_double> a0 = this->R;          // T_0[H] |r> = 1 |r>
+            arma::Mat<cx_double> a1 = Hs_a * this->R;   // T_1[H] |r> = H |r>
+            arma::Mat<cx_double> a2(n, s);
+            for (int m = 2; m < M; m++) {
+                a2 = 2*Hs_a*a1 - a0;
+                a0 = a1;
+                a1 = a2;
+            }
+            
+            // reverse calculation
+            
+            arma::Mat<cx_double> b2(n, s);
+            arma::Mat<cx_double> b1(n, s, arma::fill::zeros);
+            arma::Mat<cx_double> b0 = this->R * c[M - 1];
+            
+            // need special logic since mu[1] was calculated exactly
+            for (int k = 0; k < D.size(); k++) {
+                D.val[k] = (D.row_idx[k] == D.col_idx[k]) ? c[1] : 0;
+            }
+            Vec<double> cp = c; cp[1] = 0;
+            
+            for (int m = M-2; m >= 0; m--) {
+                // a0 = alpha_{m}
+                // b0 = beta_{m}
+                for (int k = 0; k < D.size(); k++) {
+                    int i = D.row_idx[k];
+                    int j = D.col_idx[k];
+                    D.val[k] += (m == 0 ? 1.0 : 2.0) * arma::cdot(b0.row(j), a0.row(i));
+                }
+                a2 = a1;
+                b2 = b1;
+                a1 = a0;
+                b1 = b0;
+                a0 = 2*Hs_a*a1 - a2;;
+                b0 = cp[m]*this->R + 2*Hs_a*b1 - b2;
+            }
+            
+            for (cx_double& v: D.val) {
+                v /= this->es.mag();
+            }
+        }
     };
     
     
