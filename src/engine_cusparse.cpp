@@ -62,8 +62,8 @@ namespace fkpm {
         cusparseHandle_t cs_handle;
         cusparseMatDescr_t cs_mat_descr;
         
-        int R_cp=0, HRowPtr_cp=0, HColIndex_cp=0, HVal_cp=0; // allocated capacities
-        int R_sz=0, HRowPtr_sz=0, HColIndex_sz=0, HVal_sz=0; // utilized size
+        int R_cp=0, HRowPtr_cp=0, HColIndex_cp=0, HVal_cp=0; // allocated capacities (bytes)
+        int R_sz=0, HRowPtr_sz=0, HColIndex_sz=0, HVal_sz=0; // utilized size (bytes)
         void *a0_d=0, *a1_d=0, *a2_d=0, *R_d=0, *xi_d=0;
         void *HColIndex_d=0, *HRowPtr_d=0, *HVal_d=0;
         
