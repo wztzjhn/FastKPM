@@ -89,7 +89,6 @@ namespace fkpm {
         int device = 0;
         int n_nonzero = 0;
         double Hs_trace = 0;
-        Vec<cx_float> cx_float_store;
         
         cusparseHandle_t cs_handle;
         cusparseMatDescr_t cs_mat_descr;
@@ -121,13 +120,13 @@ namespace fkpm {
             HColIndex_d.deallocate();
         }
         
+        Vec<cx_float> cx_float_store;
         void device_to_host_cx(CuVec<cx_float> const& src, cx_double *dst) {
             int size = src.size;
             cx_float_store.resize(size);
             src.to_host(cx_float_store.data());
             convert_array(cx_float_store.data(), size, dst);
         }
-        
         void host_to_device_cx(cx_double const* src, int size, CuVec<cx_float>& dst) {
             cx_float_store.resize(size);
             convert_array(src, size, cx_float_store.data());
@@ -142,10 +141,7 @@ namespace fkpm {
             a1_d.resize(sz);
             a2_d.resize(sz);
             xi_d.resize(sz);
-            
-            cx_float_store.resize(sz);
-            convert_array(R.memptr(), sz, cx_float_store.data());
-            R_d.from_host(sz, cx_float_store.data());
+            host_to_device_cx(R.memptr(), sz, R_d);
         }
         
         void transfer_H() {
@@ -159,10 +155,7 @@ namespace fkpm {
             
             HRowPtr_d.from_host(Hs.row_ptr.size(), Hs.row_ptr.data());
             HColIndex_d.from_host(Hs.col_idx.size(), Hs.col_idx.data());
-            
-            cx_float_store.resize(n_nonzero);
-            convert_array(Hs.val.data(), n_nonzero, cx_float_store.data());
-            HVal_d.from_host(n_nonzero, cx_float_store.data());
+            host_to_device_cx(Hs.val.data(), n_nonzero, HVal_d);
         }
         
         // C = alpha H B + beta C
@@ -236,8 +229,6 @@ namespace fkpm {
                 a_d[2] = temp;
             }
             
-            cx_float_store.resize(xi_d.size);
-            xi_d.to_host(cx_float_store.data());
             
             // TODO: replace with kernel call
             /*
@@ -252,7 +243,8 @@ namespace fkpm {
             int n = R.n_rows;
             int s = R.n_cols;
             arma::Mat<cx_double> xi(n, s);
-            convert_array(cx_float_store.data(), cx_float_store.size(), xi.memptr());
+            device_to_host_cx(xi_d, xi.memptr());
+
             for (int k = 0; k < D.size(); k++) {
                 int i = D.row_idx[k];
                 int j = D.col_idx[k];
