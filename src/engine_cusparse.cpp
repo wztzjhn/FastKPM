@@ -38,7 +38,7 @@ namespace fkpm {
 
 
 namespace fkpm {
-    void outer_product(int n_rows, int n_cols, cuFloatComplex *a, cuFloatComplex *b, float scal,
+    void outer_product(int n_rows, int n_cols, float alpha, cuFloatComplex *A, cuFloatComplex *B,
                        int D_nnz, int *D_row_idx, int *D_col_idx, cuFloatComplex *D_val);
     
     void double_to_float(double *src, int n, float *dst) {
@@ -124,7 +124,7 @@ namespace fkpm {
         
         void transfer_H() {
             TRY(cudaSetDevice(device));
-
+            
             n_nonzero = Hs.size();
             Hs_trace = 0;
             for (int i = 0; i < Hs.n_rows; i++) {
