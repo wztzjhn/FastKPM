@@ -32,7 +32,7 @@ namespace fkpm {
     { int stat = (x); \
       if (stat != cudaSuccess) { \
         std::cerr << __FILE__ << ":" << __LINE__ <<  ", " << #x << ", error " << stat << std::endl; \
-        std::exit(EXIT_FAILURE); \
+        std::abort(); \
       } \
     };
 
@@ -47,6 +47,39 @@ namespace fkpm {
             dst[i] = (T)src[i];
     }
     
+    // Caution: cudaSetDevice() must be called before any operations.
+    template <typename T>
+    class CuVec {
+    public:
+        int size = 0;
+        int capacity = 0;
+        T *ptr = 0; // TODO: T* and remove casts
+        void resize(int size) {
+            this->size = size;
+            if (size > capacity) {
+                capacity = (3*size)/2;
+                TRY(cudaFree(ptr));
+                TRY(cudaMalloc(&ptr, capacity*sizeof(T)));
+            }
+        }
+        void from_host(int size, T const* src) {
+            resize(size);
+            TRY(cudaMemcpy(ptr, src, size*sizeof(T), cudaMemcpyHostToDevice));
+        }
+        void from_device(CuVec<T> const& that) {
+            resize(that.size);
+            TRY(cudaMemcpy(ptr, that.ptr, size*sizeof(T), cudaMemcpyDeviceToDevice));
+        }
+        void to_host(T* dst) const {
+            TRY(cudaMemcpy(dst, ptr, size*sizeof(T), cudaMemcpyDeviceToHost));
+        }
+        void deallocate() {
+            TRY(cudaFree(ptr));
+            size = capacity = 0;
+            ptr = 0;
+        }
+    };
+    
     template <typename T>
     class Engine_cuSPARSE;
     
@@ -56,15 +89,13 @@ namespace fkpm {
         int device = 0;
         int n_nonzero = 0;
         double Hs_trace = 0;
-        Vec<float> flt_store;
+        Vec<cx_float> cx_float_store;
         
         cusparseHandle_t cs_handle;
         cusparseMatDescr_t cs_mat_descr;
         
-        int R_cp=0, HRowPtr_cp=0, HColIndex_cp=0, HVal_cp=0; // allocated capacities (bytes)
-        int R_sz=0, HRowPtr_sz=0, HColIndex_sz=0, HVal_sz=0; // utilized size (bytes)
-        void *a0_d=0, *a1_d=0, *a2_d=0, *R_d=0, *xi_d=0;
-        void *HColIndex_d=0, *HRowPtr_d=0, *HVal_d=0;
+        CuVec<cx_float> a0_d, a1_d, a2_d, R_d, xi_d, HVal_d;
+        CuVec<int> HColIndex_d, HRowPtr_d;
         
         
         Engine_cuSPARSE(int device) {
@@ -80,42 +111,41 @@ namespace fkpm {
         
         ~Engine_cuSPARSE() {
             TRY(cudaSetDevice(device));
-            
-            TRY(cudaFree(a0_d));
-            TRY(cudaFree(a1_d));
-            TRY(cudaFree(a2_d));
-            TRY(cudaFree(R_d));
-            TRY(cudaFree(xi_d));
-            
-            TRY(cudaFree(HRowPtr_d));
-            TRY(cudaFree(HColIndex_d));
-            TRY(cudaFree(HVal_d));
+            a0_d.deallocate();
+            a1_d.deallocate();
+            a2_d.deallocate();
+            R_d.deallocate();
+            xi_d.deallocate();
+            HVal_d.deallocate();
+            HRowPtr_d.deallocate();
+            HColIndex_d.deallocate();
+        }
+        
+        void device_to_host_cx(CuVec<cx_float> const& src, cx_double *dst) {
+            int size = src.size;
+            cx_float_store.resize(size);
+            src.to_host(cx_float_store.data());
+            convert_array(cx_float_store.data(), size, dst);
+        }
+        
+        void host_to_device_cx(cx_double const* src, int size, CuVec<cx_float>& dst) {
+            cx_float_store.resize(size);
+            convert_array(src, size, cx_float_store.data());
+            dst.from_host(size, cx_float_store.data());
         }
         
         void transfer_R() {
             TRY(cudaSetDevice(device));
             
-            R_sz = R.size()*sizeof(cx_float);
+            int sz = R.size();
+            a0_d.resize(sz);
+            a1_d.resize(sz);
+            a2_d.resize(sz);
+            xi_d.resize(sz);
             
-            if (R_sz > R_cp) {
-                R_cp = R_sz;
-                
-                TRY(cudaFree(a0_d));
-                TRY(cudaFree(a1_d));
-                TRY(cudaFree(a2_d));
-                TRY(cudaFree(R_d));
-                TRY(cudaFree(xi_d));
-                
-                TRY(cudaMalloc(&a0_d, R_cp));
-                TRY(cudaMalloc(&a1_d, R_cp));
-                TRY(cudaMalloc(&a2_d, R_cp));
-                TRY(cudaMalloc(&R_d, R_cp));
-                TRY(cudaMalloc(&xi_d, R_cp));
-            }
-            
-            flt_store.resize(2*R.size());
-            convert_array((double *)R.memptr(), flt_store.size(), flt_store.data());
-            TRY(cudaMemcpy(R_d, flt_store.data(), R_sz, cudaMemcpyHostToDevice));
+            cx_float_store.resize(sz);
+            convert_array(R.memptr(), sz, cx_float_store.data());
+            R_d.from_host(sz, cx_float_store.data());
         }
         
         void transfer_H() {
@@ -127,33 +157,16 @@ namespace fkpm {
                 Hs_trace += std::real(Hs(i, i));
             }
             
-            HRowPtr_sz   = (Hs.n_rows+1)*sizeof(int);
-            HColIndex_sz = n_nonzero*sizeof(int);
-            HVal_sz      = n_nonzero*sizeof(cx_float);
+            HRowPtr_d.from_host(Hs.row_ptr.size(), Hs.row_ptr.data());
+            HColIndex_d.from_host(Hs.col_idx.size(), Hs.col_idx.data());
             
-            if (HRowPtr_sz > HRowPtr_cp || HColIndex_sz > HColIndex_cp || HVal_sz > HVal_cp) {
-                HRowPtr_cp   = HRowPtr_sz;
-                HColIndex_cp = HColIndex_sz;
-                HVal_cp      = HVal_sz;
-                
-                TRY(cudaFree(HRowPtr_d));
-                TRY(cudaFree(HColIndex_d));
-                TRY(cudaFree(HVal_d));
-                
-                TRY(cudaMalloc(&HRowPtr_d,   HRowPtr_cp));
-                TRY(cudaMalloc(&HColIndex_d, HColIndex_cp));
-                TRY(cudaMalloc(&HVal_d,      HVal_cp));
-            }
-            
-            flt_store.resize(2*n_nonzero);
-            convert_array((double *)Hs.val.data(), flt_store.size(), flt_store.data());
-            TRY(cudaMemcpy(HRowPtr_d,   Hs.row_ptr.data(), HRowPtr_sz,   cudaMemcpyHostToDevice));
-            TRY(cudaMemcpy(HColIndex_d, Hs.col_idx.data(), HColIndex_sz, cudaMemcpyHostToDevice));
-            TRY(cudaMemcpy(HVal_d,      flt_store.data(),  HVal_sz,      cudaMemcpyHostToDevice));
+            cx_float_store.resize(n_nonzero);
+            convert_array(Hs.val.data(), n_nonzero, cx_float_store.data());
+            HVal_d.from_host(n_nonzero, cx_float_store.data());
         }
         
         // C = alpha H B + beta C
-        void cgemm_H(cx_double alpha, void *B_d, cx_double beta, void *C_d) {
+        void cgemm_H(cx_double alpha, CuVec<cx_float> B_d, cx_double beta, CuVec<cx_float> C_d) {
             int n = R.n_rows;
             int s = R.n_cols;
             auto alpha_f = make_cuComplex(alpha.real(), alpha.imag());
@@ -161,10 +174,10 @@ namespace fkpm {
             TRY(cusparseCcsrmm(cs_handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
                            n, s, n, n_nonzero, // (H rows, B cols, H cols, H nnz)
                            &alpha_f,
-                           cs_mat_descr, (cuComplex *)HVal_d, (int *)HRowPtr_d, (int *)HColIndex_d, // H matrix
-                           (cuComplex *)B_d, n, // (B, B rows)
+                           cs_mat_descr, (cuComplex *)HVal_d.ptr, HRowPtr_d.ptr, HColIndex_d.ptr, // H matrix
+                           (cuComplex *)B_d.ptr, n, // (B, B rows)
                            &beta_f,
-                           (cuComplex *)C_d, n)); // (C, C rows)
+                           (cuComplex *)C_d.ptr, n)); // (C, C rows)
         }
         
         
@@ -177,15 +190,15 @@ namespace fkpm {
             mu[0] = Hs.n_rows;  // Tr[T_0[H]] = Tr[1]
             mu[1] = Hs_trace;   // Tr[T_1[H]] = Tr[H]
             
-            Vec<void *> a_d { a0_d, a1_d, a2_d };
-            TRY(cudaMemcpy(a_d[0], R_d, R_sz, cudaMemcpyDeviceToDevice));    // a0 = T_0[H] R = R
-            cgemm_H(1, R_d, 0, a_d[1]);                                      // a1 = T_1[H] R = H R
+            Vec<CuVec<cx_float>> a_d { a0_d, a1_d, a2_d };
+            a_d[0].from_device(R_d);            // a0 = T_0[H] R = R
+            cgemm_H(1, R_d, 0, a_d[1]);         // a1 = T_1[H] R = H R
             
             for (int m = 2; m < M; m++) {
-                TRY(cudaMemcpy(a_d[2], a_d[0], R_sz, cudaMemcpyDeviceToDevice));
-                cgemm_H(2, a_d[1], -1, a_d[2]);                              // a2 = T_m[H] R = 2 H a1 - a0
+                a_d[2].from_device(a_d[0]);
+                cgemm_H(2, a_d[1], -1, a_d[2]); // a2 = T_m[H] R = 2 H a1 - a0
                 
-                mu[m] = cublasCdotc(R.size(), (cuComplex *)R_d, 1, (cuComplex *)a_d[2], 1).x; // R^\dag \dot alpha_2
+                mu[m] = cublasCdotc(R.size(), (cuComplex *)R_d.ptr, 1, (cuComplex *)a_d[2].ptr, 1).x; // R^\dag \dot alpha_2
                 
                 auto temp = a_d[0];
                 a_d[0] = a_d[1];
@@ -200,22 +213,22 @@ namespace fkpm {
             
             assert(Hs.n_rows == R.n_rows && Hs.n_cols == R.n_rows);
             
-            Vec<void *> a_d { a0_d, a1_d, a2_d };
-            TRY(cudaMemcpy(a_d[0], R_d, R_sz, cudaMemcpyDeviceToDevice));  // a0 = T_0[H] R = R
-            cgemm_H(1, R_d, 0, a_d[1]);                                    // a1 = T_1[H] R = H R
+            Vec<CuVec<cx_float>> a_d { a0_d, a1_d, a2_d };
+            a_d[0].from_device(R_d);            // a0 = T_0[H] R = R
+            cgemm_H(1, R_d, 0, a_d[1]);         // a1 = T_1[H] R = H R
             
             // xi = c0 a0 + c1 a1
-            cudaMemset(xi_d, 0, R_sz);
-            cublasCaxpy(R.size(), make_cuComplex(c[0], 0), (cuComplex *)a_d[0], 1, (cuComplex *)xi_d, 1);
-            cublasCaxpy(R.size(), make_cuComplex(c[1], 0), (cuComplex *)a_d[1], 1, (cuComplex *)xi_d, 1);
+            cudaMemset(xi_d.ptr, 0, xi_d.size*sizeof(cx_float));
+            cublasCaxpy(R.size(), make_cuComplex(c[0], 0), (cuComplex *)a_d[0].ptr, 1, (cuComplex *)xi_d.ptr, 1);
+            cublasCaxpy(R.size(), make_cuComplex(c[1], 0), (cuComplex *)a_d[1].ptr, 1, (cuComplex *)xi_d.ptr, 1);
             
             int M = c.size();
             for (int m = 2; m < M; m++) {
-                TRY(cudaMemcpy(a_d[2], a_d[0], R_sz, cudaMemcpyDeviceToDevice));
-                cgemm_H(2, a_d[1], -1, a_d[2]);                            // a2 = T_m[H] R = 2 H a1 - a0
+                a_d[2].from_device(a_d[0]);
+                cgemm_H(2, a_d[1], -1, a_d[2]); // a2 = T_m[H] R = 2 H a1 - a0
                 
                 // xi += cm a2
-                cublasCaxpy(R.size(), make_cuComplex(c[m], 0), (cuComplex *)a_d[2], 1, (cuComplex *)xi_d, 1);
+                cublasCaxpy(R.size(), make_cuComplex(c[m], 0), (cuComplex *)a_d[2].ptr, 1, (cuComplex *)xi_d.ptr, 1);
                 
                 auto temp = a_d[0];
                 a_d[0] = a_d[1];
@@ -223,8 +236,8 @@ namespace fkpm {
                 a_d[2] = temp;
             }
             
-            Vec<float> temp(2*R.size());
-            cudaMemcpy(temp.data(), xi_d, R_sz, cudaMemcpyDeviceToHost);
+            cx_float_store.resize(xi_d.size);
+            xi_d.to_host(cx_float_store.data());
             
             // TODO: replace with kernel call
             /*
@@ -239,7 +252,7 @@ namespace fkpm {
             int n = R.n_rows;
             int s = R.n_cols;
             arma::Mat<cx_double> xi(n, s);
-            convert_array(temp.data(), temp.size(), (double *)xi.memptr());
+            convert_array(cx_float_store.data(), cx_float_store.size(), xi.memptr());
             for (int k = 0; k < D.size(); k++) {
                 int i = D.row_idx[k];
                 int j = D.col_idx[k];
