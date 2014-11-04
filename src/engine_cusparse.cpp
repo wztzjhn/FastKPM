@@ -244,29 +244,16 @@ namespace fkpm {
                 a_d[2] = temp;
             }
             
-            
-            // TODO: replace with kernel call
-            /*
-            int D_nnz = 0;
-            int *D_row_idx = nullptr;
-            int *D_col_idx = nullptr;
-            cuFloatComplex *D_val = nullptr;
-            outer_product(R.n_rows, R.n_cols, (cuFloatComplex *)R_d, (cuFloatComplex *)xi_d, 0.5,
-                          D_nnz, D_row_idx, D_col_idx, D_val);
-            */
-            
-            int n = R.n_rows;
-            int s = R.n_cols;
-            arma::Mat<cx_double> xi(n, s);
-            device_to_host_cx(xi_d, xi.memptr());
-
-            for (int k = 0; k < D.size(); k++) {
-                int i = D.row_idx[k];
-                int j = D.col_idx[k];
-                cx_double x1 = arma::cdot(R.row(j), xi.row(i)); // xi R^dagger
-                cx_double x2 = arma::cdot(xi.row(j), R.row(i)); // R xi^dagger
-                D.val[k] = 0.5*(x1+x2);
-            }
+            // D_ij = (1/2) [R_ik conj(\xi_jk) + \xi_ik conj(R_jk)]
+            DRowIndex_d.from_host(D.row_idx.size(), D.row_idx.data());
+            DColIndex_d.from_host(D.col_idx.size(), D.col_idx.data());
+            DVal_d.resize(D.val.size());
+            DVal_d.memset(0);
+            outer_product(R.n_rows, R.n_cols, 0.5, (cuFloatComplex *)R_d.ptr, (cuFloatComplex *)xi_d.ptr,
+                          D.size(), DRowIndex_d.ptr, DColIndex_d.ptr, (cuFloatComplex *)DVal_d.ptr);
+            outer_product(R.n_rows, R.n_cols, 0.5, (cuFloatComplex *)xi_d.ptr, (cuFloatComplex *)R_d.ptr,
+                          D.size(), DRowIndex_d.ptr, DColIndex_d.ptr, (cuFloatComplex *)DVal_d.ptr);
+            device_to_host_cx(DVal_d, D.val.data());
         }
         
         void autodiff_matrix(Vec<double> const& c, SpMatCsr<cx_double>& D) {

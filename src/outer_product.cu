@@ -16,13 +16,13 @@ namespace fkpm {
                 acc_re += a.x * b.x + a.y * b.y;
                 acc_im += a.y * b.x - a.x * b.y;
             }
-            // D_val[idx] += alpha * acc
+            // D_ij += alpha * acc
             D_val[idx] = cuCaddf(D_val[idx], make_cuFloatComplex(alpha*acc_re, alpha*acc_im));
             idx += gridDim.x*blockDim.x;
         }
     }
-
-    // D(i,j) += alpha \sum_k A(i, k) conj[B(j, k)]
+    
+    // D_ij += alpha \sum_k A_ik conj(B_jk)
     void outer_product(int n_rows, int n_cols, float alpha, cuFloatComplex *A, cuFloatComplex *B,
                        int D_nnz, int *D_row_idx, int *D_col_idx, cuFloatComplex *D_val) {
         int block_size = 64;
