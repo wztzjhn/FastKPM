@@ -62,6 +62,9 @@ namespace fkpm {
                 TRY(cudaMalloc(&ptr, capacity*sizeof(T)));
             }
         }
+        void memset(int value) {
+            TRY(cudaMemset(ptr, value, size*sizeof(T)));
+        }
         void from_host(int size, T const* src) {
             resize(size);
             TRY(cudaMemcpy(ptr, src, size*sizeof(T), cudaMemcpyHostToDevice));
@@ -93,10 +96,16 @@ namespace fkpm {
         cusparseHandle_t cs_handle;
         cusparseMatDescr_t cs_mat_descr;
         
-        CuVec<cx_float> a0_d, a1_d, a2_d, R_d, xi_d, HVal_d;
+        CuVec<cx_float> R_d, xi_d;
+        CuVec<cx_float> a_d[3];
+        CuVec<cx_float> b_d[3];
+        
         CuVec<int> HColIndex_d, HRowPtr_d;
+        CuVec<cx_float> HVal_d;
         
-        
+        CuVec<int> DRowIndex_d, DColIndex_d;
+        CuVec<cx_float> DVal_d;
+
         Engine_cuSPARSE(int device) {
             this->device = device;
             TRY(cudaSetDevice(device));
@@ -110,14 +119,21 @@ namespace fkpm {
         
         ~Engine_cuSPARSE() {
             TRY(cudaSetDevice(device));
-            a0_d.deallocate();
-            a1_d.deallocate();
-            a2_d.deallocate();
+
             R_d.deallocate();
             xi_d.deallocate();
-            HVal_d.deallocate();
+            for (int i = 0; i < 3; i++) {
+                a_d[i].deallocate();
+                b_d[i].deallocate();
+            }
+            
             HRowPtr_d.deallocate();
             HColIndex_d.deallocate();
+            HVal_d.deallocate();
+            
+            DRowIndex_d.deallocate();
+            DColIndex_d.deallocate();
+            DVal_d.deallocate();
         }
         
         Vec<cx_float> cx_float_store;
@@ -137,11 +153,12 @@ namespace fkpm {
             TRY(cudaSetDevice(device));
             
             int sz = R.size();
-            a0_d.resize(sz);
-            a1_d.resize(sz);
-            a2_d.resize(sz);
-            xi_d.resize(sz);
             host_to_device_cx(R.memptr(), sz, R_d);
+            xi_d.resize(sz);
+            for (int i = 0; i < 3; i++) {
+                a_d[i].resize(sz);
+                b_d[i].resize(sz);
+            }
         }
         
         void transfer_H() {
@@ -183,7 +200,6 @@ namespace fkpm {
             mu[0] = Hs.n_rows;  // Tr[T_0[H]] = Tr[1]
             mu[1] = Hs_trace;   // Tr[T_1[H]] = Tr[H]
             
-            Vec<CuVec<cx_float>> a_d { a0_d, a1_d, a2_d };
             a_d[0].from_device(R_d);            // a0 = T_0[H] R = R
             cgemm_H(1, R_d, 0, a_d[1]);         // a1 = T_1[H] R = H R
             
@@ -206,12 +222,11 @@ namespace fkpm {
             
             assert(Hs.n_rows == R.n_rows && Hs.n_cols == R.n_rows);
             
-            Vec<CuVec<cx_float>> a_d { a0_d, a1_d, a2_d };
             a_d[0].from_device(R_d);            // a0 = T_0[H] R = R
             cgemm_H(1, R_d, 0, a_d[1]);         // a1 = T_1[H] R = H R
             
             // xi = c0 a0 + c1 a1
-            cudaMemset(xi_d.ptr, 0, xi_d.size*sizeof(cx_float));
+            xi_d.memset(0);
             cublasCaxpy(R.size(), make_cuComplex(c[0], 0), (cuComplex *)a_d[0].ptr, 1, (cuComplex *)xi_d.ptr, 1);
             cublasCaxpy(R.size(), make_cuComplex(c[1], 0), (cuComplex *)a_d[1].ptr, 1, (cuComplex *)xi_d.ptr, 1);
             
