@@ -257,50 +257,51 @@ namespace fkpm {
         }
         
         void autodiff_matrix(Vec<double> const& c, SpMatCsr<cx_double>& D) {
-            int M = c.size();
-            arma::SpMat<cx_double> Hs_a = this->Hs.to_arma();
-            int n = this->R.n_rows;
-            int s = this->R.n_cols;
-            
-            // forward calculation
-            
-            arma::Mat<cx_double> a0 = this->R;          // T_0[H] |r> = 1 |r>
-            arma::Mat<cx_double> a1 = Hs_a * this->R;   // T_1[H] |r> = H |r>
-            arma::Mat<cx_double> a2(n, s);
-            for (int m = 2; m < M; m++) {
-                a2 = 2*Hs_a*a1 - a0;
-                a0 = a1;
-                a1 = a2;
-            }
-            
-            // reverse calculation
-            
-            arma::Mat<cx_double> b2(n, s);
-            arma::Mat<cx_double> b1(n, s, arma::fill::zeros);
-            arma::Mat<cx_double> b0 = this->R * c[M - 1];
-            
             // need special logic since mu[1] was calculated exactly
             for (int k = 0; k < D.size(); k++) {
                 D.val[k] = (D.row_idx[k] == D.col_idx[k]) ? c[1] : 0;
             }
-            Vec<double> cp = c; cp[1] = 0;
+            auto cp = [&](int m) { return (m == 1) ? 0 : c[m]; };
+            
+            DRowIndex_d.from_host(D.row_idx.size(), D.row_idx.data());
+            DColIndex_d.from_host(D.col_idx.size(), D.col_idx.data());
+            host_to_device_cx(D.val.data(), D.val.size(), DVal_d);
+            
+            int M = c.size();
+            b_d[1].memset(0);                             // b1 = 0
+            b_d[0].from_device(R_d);                      // b0 = c(M-1) R
+            cublasCscal(b_d[0].size, make_cuComplex(cp(M-1), 0), (cuComplex *)b_d[0].ptr, 1);
             
             for (int m = M-2; m >= 0; m--) {
                 // a0 = alpha_{m}
                 // b0 = beta_{m}
-                for (int k = 0; k < D.size(); k++) {
-                    int i = D.row_idx[k];
-                    int j = D.col_idx[k];
-                    D.val[k] += (m == 0 ? 1.0 : 2.0) * arma::cdot(b0.row(j), a0.row(i));
-                }
-                a2 = a1;
-                b2 = b1;
-                a1 = a0;
-                b1 = b0;
-                a0 = 2*Hs_a*a1 - a2;;
-                b0 = cp[m]*this->R + 2*Hs_a*b1 - b2;
+                double scale = (m == 0) ? 1 : 2;
+                // D_ij += scale a0_ik conj(\b0_jk)
+                outer_product(R.n_rows, R.n_cols, scale, (cuFloatComplex *)a_d[0].ptr, (cuFloatComplex *)b_d[0].ptr,
+                              D.size(), DRowIndex_d.ptr, DColIndex_d.ptr, (cuFloatComplex *)DVal_d.ptr);
+                
+                // (a0, a1, a2) <= (2 H a1 - a2, a0, a1)
+                auto temp = a_d[2];
+                a_d[2] = a_d[1];
+                a_d[1] = a_d[0];
+                a_d[0] = temp;
+                a_d[0].from_device(a_d[2]);
+                cgemm_H(2, a_d[1], -1, a_d[0]); // a0 = 2 H a1 - a2
+                
+                // (b0, b1, b2) <= (2 H b1 - b2 + c(m) r, a0, a1)
+                temp = b_d[2];
+                b_d[2] = b_d[1];
+                b_d[1] = b_d[0];
+                b_d[0] = temp;
+                b_d[0].from_device(b_d[2]);
+                cgemm_H(2, b_d[1], -1, b_d[0]); // b0 = 2 H b1 - b2
+                cublasCaxpy(R.size(),           // b0 += c(m) r
+                            make_cuComplex(cp(m), 0),
+                            (cuComplex *)R_d.ptr, 1,
+                            (cuComplex *)b_d[0].ptr, 1);
             }
             
+            device_to_host_cx(DVal_d, D.val.data());
             for (cx_double& v: D.val) {
                 v /= this->es.mag();
             }

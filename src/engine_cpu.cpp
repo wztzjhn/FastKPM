@@ -65,15 +65,15 @@ namespace fkpm {
             int n = this->R.n_rows;
             int s = this->R.n_cols;
             
-            arma::Mat<T> b2(n, s);
-            arma::Mat<T> b1(n, s, arma::fill::zeros);
-            arma::Mat<T> b0 = this->R * c[M - 1];
-            
             // need special logic since mu[1] was calculated exactly
             for (int k = 0; k < D.size(); k++) {
                 D.val[k] = (D.row_idx[k] == D.col_idx[k]) ? c[1] : 0;
             }
-            Vec<double> cp = c; cp[1] = 0;
+            auto cp = [&](int m) { return (m == 1) ? 0 : c[m]; };
+            
+            arma::Mat<T> b2(n, s);
+            arma::Mat<T> b1(n, s, arma::fill::zeros);
+            arma::Mat<T> b0 = this->R * cp(M - 1);
             
             for (int m = M-2; m >= 0; m--) {
                 // a0 = alpha_{m}
@@ -87,8 +87,8 @@ namespace fkpm {
                 b2 = b1;
                 a1 = a0;
                 b1 = b0;
-                a0 = 2*Hs_a*a1 - a2;;
-                b0 = cp[m]*this->R + 2*Hs_a*b1 - b2;
+                a0 = 2*Hs_a*a1 - a2;
+                b0 = cp(m)*this->R + 2*Hs_a*b1 - b2;
             }
             
             for (T& v: D.val) {
