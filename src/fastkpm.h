@@ -134,10 +134,10 @@ namespace fkpm {
     // CPU engine
     template <typename T>
     std::shared_ptr<Engine<T>> mk_engine_cpu();
-
+    
     // CuSPARSE engine
     template <typename T>
-    std::shared_ptr<Engine<T>> mk_engine_cuSPARSE();
+    std::shared_ptr<Engine<T>> mk_engine_cuSPARSE(int device);
     
     // Fastest engine available
     template <typename T>

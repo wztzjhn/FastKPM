@@ -310,14 +310,20 @@ namespace fkpm {
     
     
     template <typename T>
-    std::shared_ptr<Engine<T>> mk_engine_cuSPARSE() {
+    std::shared_ptr<Engine<T>> mk_engine_cuSPARSE(int device) {
         int count;
         int err = cudaGetDeviceCount(&count);
         switch (err) {
             case cudaSuccess:
-                return std::make_shared<Engine_cuSPARSE<T>>(0);
+                if (device < count) {
+                    return std::make_shared<Engine_cuSPARSE<T>>(device);
+                }
+                else {
+                    std::cerr << "Requested device " << device << " but only " << count << " are available!\n";
+                    return nullptr;
+                }
             case cudaErrorNoDevice:
-                std::cerr << "No CUDA device available!\n";
+                std::cerr << "No CUDA device is available!\n";
                 return nullptr;
             case cudaErrorInsufficientDriver:
                 std::cerr << "Insufficient CUDA driver!\n";
@@ -328,11 +334,11 @@ namespace fkpm {
         }
     }
     template <>
-    std::shared_ptr<Engine<double>> mk_engine_cuSPARSE() {
+    std::shared_ptr<Engine<double>> mk_engine_cuSPARSE(int device) {
         std::cerr << "cuSPARSE engine not yet implemented for type `double`!\n";
         return nullptr; // not yet implemented
     }
-    template std::shared_ptr<Engine<cx_double>> mk_engine_cuSPARSE();
+    template std::shared_ptr<Engine<cx_double>> mk_engine_cuSPARSE(int device);
 }
 
 #endif // WITH_CUDA
