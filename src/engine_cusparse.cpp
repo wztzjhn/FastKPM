@@ -29,13 +29,12 @@ namespace fkpm {
 #include <cublas.h>
 
 #define TRY(x) \
-    { int stat = (x); \
+    { cudaError_t stat = (x); \
       if (stat != cudaSuccess) { \
-        std::cerr << __FILE__ << ":" << __LINE__ <<  ", " << #x << ", error " << stat << std::endl; \
+        std::cerr << __FILE__ << ":" << __LINE__ <<  ", " << #x << ", Error: " << cudaGetErrorString(stat) << std::endl; \
         std::abort(); \
       } \
     };
-
 
 namespace fkpm {
     void outer_product(int n_rows, int n_cols, float alpha, cuFloatComplex *A, cuFloatComplex *B,
@@ -110,8 +109,8 @@ namespace fkpm {
             this->device = device;
             TRY(cudaSetDevice(device));
             
-            TRY(cusparseCreate(&cs_handle));
-            TRY(cusparseCreateMatDescr(&cs_mat_descr));
+            cusparseCreate(&cs_handle);
+            cusparseCreateMatDescr(&cs_mat_descr);
             // TODO: CUSPARSE_MATRIX_TYPE_HERMITIAN
             cusparseSetMatType(cs_mat_descr, CUSPARSE_MATRIX_TYPE_GENERAL);
             cusparseSetMatIndexBase(cs_mat_descr, CUSPARSE_INDEX_BASE_ZERO);
@@ -181,13 +180,13 @@ namespace fkpm {
             int s = R.n_cols;
             auto alpha_f = make_cuComplex(alpha.real(), alpha.imag());
             auto beta_f  = make_cuComplex(beta.real(),  beta.imag());
-            TRY(cusparseCcsrmm(cs_handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
+            cusparseCcsrmm(cs_handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
                            n, s, n, n_nonzero, // (H rows, B cols, H cols, H nnz)
                            &alpha_f,
                            cs_mat_descr, (cuComplex *)HVal_d.ptr, HRowPtr_d.ptr, HColIndex_d.ptr, // H matrix
                            (cuComplex *)B_d.ptr, n, // (B, B rows)
                            &beta_f,
-                           (cuComplex *)C_d.ptr, n)); // (C, C rows)
+                           (cuComplex *)C_d.ptr, n); // (C, C rows)
         }
         
         
