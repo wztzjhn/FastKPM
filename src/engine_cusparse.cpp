@@ -69,7 +69,7 @@ namespace fkpm {
     }
     template <typename T>
     void testCudaError(T stat, char const* file, int line, char const* code) {
-        if (stat != cudaSuccess) {
+        if (stat) {
             std::cerr << file << ":" << line <<  ", " << code << ", Error: " << genericCudaErrorString(stat) << std::endl;
             std::abort();
         }
