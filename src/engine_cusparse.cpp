@@ -28,15 +28,53 @@ namespace fkpm {
 #include <cusparse.h>
 #include <cublas.h>
 
-#define TRY(x) \
-    { cudaError_t stat = (x); \
-      if (stat != cudaSuccess) { \
-        std::cerr << __FILE__ << ":" << __LINE__ <<  ", " << #x << ", Error: " << cudaGetErrorString(stat) << std::endl; \
-        std::abort(); \
-      } \
-    };
+
+#define TRY(x) testCudaError((x), __FILE__, __LINE__, #x)
 
 namespace fkpm {
+    template <typename T>
+    const char *genericCudaErrorString(T stat);
+    template <>
+    const char *genericCudaErrorString(cudaError_t stat) { return cudaGetErrorString(stat); }
+    template <>
+    const char *genericCudaErrorString(cublasStatus_t stat) {
+        switch (stat) {
+            case CUBLAS_STATUS_SUCCESS:             return "CUBLAS_STATUS_SUCCESS";
+            case CUBLAS_STATUS_NOT_INITIALIZED:     return "CUBLAS_STATUS_NOT_INITIALIZED";
+            case CUBLAS_STATUS_ALLOC_FAILED:        return "CUBLAS_STATUS_ALLOC_FAILED";
+            case CUBLAS_STATUS_INVALID_VALUE:       return "CUBLAS_STATUS_INVALID_VALUE";
+            case CUBLAS_STATUS_ARCH_MISMATCH:       return "CUBLAS_STATUS_ARCH_MISMATCH";
+            case CUBLAS_STATUS_MAPPING_ERROR:       return "CUBLAS_STATUS_MAPPING_ERROR";
+            case CUBLAS_STATUS_EXECUTION_FAILED:    return "CUBLAS_STATUS_EXECUTION_FAILED";
+            case CUBLAS_STATUS_INTERNAL_ERROR:      return "CUBLAS_STATUS_INTERNAL_ERROR";
+            case CUBLAS_STATUS_NOT_SUPPORTED:       return "CUBLAS_STATUS_NOT_SUPPORTED";
+            default:                                return "<unknown cublas error>";
+        }
+    }
+    template <>
+    const char *genericCudaErrorString(cusparseStatus_t stat) {
+        switch (stat) {
+            case CUSPARSE_STATUS_SUCCESS:           return "CUSPARSE_STATUS_SUCCESS";
+            case CUSPARSE_STATUS_NOT_INITIALIZED:   return "CUSPARSE_STATUS_NOT_INITIALIZED";
+            case CUSPARSE_STATUS_ALLOC_FAILED:      return "CUSPARSE_STATUS_ALLOC_FAILED";
+            case CUSPARSE_STATUS_INVALID_VALUE:     return "CUSPARSE_STATUS_INVALID_VALUE";
+            case CUSPARSE_STATUS_ARCH_MISMATCH:     return "CUSPARSE_STATUS_ARCH_MISMATCH";
+            case CUSPARSE_STATUS_MAPPING_ERROR:     return "CUSPARSE_STATUS_MAPPING_ERROR";
+            case CUSPARSE_STATUS_EXECUTION_FAILED:  return "CUSPARSE_STATUS_EXECUTION_FAILED";
+            case CUSPARSE_STATUS_INTERNAL_ERROR:    return "CUSPARSE_STATUS_INTERNAL_ERROR";
+            case CUSPARSE_STATUS_MATRIX_TYPE_NOT_SUPPORTED: return "CUSPARSE_STATUS_MATRIX_TYPE_NOT_SUPPORTED";
+            case CUSPARSE_STATUS_ZERO_PIVOT:        return "CUSPARSE_STATUS_ZERO_PIVOT";
+            default:                                return "<unknown cusparse error>";
+        }
+    }
+    template <typename T>
+    void testCudaError(T stat, char const* file, int line, char const* code) {
+        if (stat != cudaSuccess) {
+            std::cerr << file << ":" << line <<  ", " << code << ", Error: " << genericCudaErrorString(stat) << std::endl;
+            std::abort();
+        }
+    }
+    
     void outer_product(int n_rows, int n_cols, float alpha, cuFloatComplex *A, cuFloatComplex *B,
                        int D_nnz, int *D_row_idx, int *D_col_idx, cuFloatComplex *D_val);
     
@@ -109,11 +147,11 @@ namespace fkpm {
             this->device = device;
             TRY(cudaSetDevice(device));
             
-            cusparseCreate(&cs_handle);
-            cusparseCreateMatDescr(&cs_mat_descr);
+            TRY(cusparseCreate(&cs_handle));
+            TRY(cusparseCreateMatDescr(&cs_mat_descr));
             // TODO: CUSPARSE_MATRIX_TYPE_HERMITIAN
-            cusparseSetMatType(cs_mat_descr, CUSPARSE_MATRIX_TYPE_GENERAL);
-            cusparseSetMatIndexBase(cs_mat_descr, CUSPARSE_INDEX_BASE_ZERO);
+            TRY(cusparseSetMatType(cs_mat_descr, CUSPARSE_MATRIX_TYPE_GENERAL));
+            TRY(cusparseSetMatIndexBase(cs_mat_descr, CUSPARSE_INDEX_BASE_ZERO));
         }
         
         ~Engine_cuSPARSE() {
@@ -180,13 +218,13 @@ namespace fkpm {
             int s = R.n_cols;
             auto alpha_f = make_cuComplex(alpha.real(), alpha.imag());
             auto beta_f  = make_cuComplex(beta.real(),  beta.imag());
-            cusparseCcsrmm(cs_handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
-                           n, s, n, n_nonzero, // (H rows, B cols, H cols, H nnz)
-                           &alpha_f,
-                           cs_mat_descr, (cuComplex *)HVal_d.ptr, HRowPtr_d.ptr, HColIndex_d.ptr, // H matrix
-                           (cuComplex *)B_d.ptr, n, // (B, B rows)
-                           &beta_f,
-                           (cuComplex *)C_d.ptr, n); // (C, C rows)
+            TRY(cusparseCcsrmm(cs_handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
+                               n, s, n, n_nonzero, // (H rows, B cols, H cols, H nnz)
+                               &alpha_f,
+                               cs_mat_descr, (cuComplex *)HVal_d.ptr, HRowPtr_d.ptr, HColIndex_d.ptr, // H matrix
+                               (cuComplex *)B_d.ptr, n, // (B, B rows)
+                               &beta_f,
+                               (cuComplex *)C_d.ptr, n)); // (C, C rows)
         }
         
         
