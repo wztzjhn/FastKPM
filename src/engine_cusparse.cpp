@@ -278,6 +278,8 @@ namespace fkpm {
                 // D_ij += scale a0_ik conj(\b0_jk)
                 outer_product(R.n_rows, R.n_cols, scale, (cuFloatComplex *)a_d[0].ptr, (cuFloatComplex *)b_d[0].ptr,
                               D.size(), DRowIndex_d.ptr, DColIndex_d.ptr, (cuFloatComplex *)DVal_d.ptr);
+                TRY(cudaPeekAtLastError());
+                TRY(cudaDeviceSynchronize());
                 
                 // (a0, a1, a2) <= (2 H a1 - a2, a0, a1)
                 auto temp = a_d[2];
