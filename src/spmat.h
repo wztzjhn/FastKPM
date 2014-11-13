@@ -4,9 +4,6 @@
 #include <armadillo>
 
 namespace fkpm {
-    template <typename T>
-    using Vec = std::vector<T>;
-
     
     // Sparse matrix in Coordinate list format
     template <typename T>
@@ -114,6 +111,18 @@ namespace fkpm {
         void zeros() {
             for (T& v: val) {
                 v = 0;
+            }
+        }
+        void symmetrize() {
+            for (int k = 0; k < size(); k++) {
+                int i = row_idx[k];
+                int j = col_idx[k];
+                if (i >= j) {
+                    T v1 = (*this)(i, j);
+                    T v2 = (*this)(j, i);
+                    (*this)(i, j) = 0.5 * (v1 + conj(v2));
+                    (*this)(j, i) = 0.5 * (conj(v1) + v2);
+                }
             }
         }
         arma::SpMat<T> to_arma() const {

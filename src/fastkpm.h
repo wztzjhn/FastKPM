@@ -7,8 +7,6 @@
 #include <memory>
 #include <armadillo>
 
-#include "spmat.h"
-
 
 namespace fkpm {
     typedef std::mt19937 RNG;
@@ -18,6 +16,16 @@ namespace fkpm {
     
     typedef std::complex<double> cx_double;
     typedef std::complex<float>  cx_float;
+    
+    // complex conjugation that is valid also for real values
+    template <typename T>   T conj(T x);
+    template <>             inline cx_double conj(cx_double x) { return std::conj(x); }
+    template <>             inline double conj(double x) { return x; }
+}
+
+#include "spmat.h"
+
+namespace fkpm {
     
     class Timer {
     public:
@@ -91,7 +99,6 @@ namespace fkpm {
     double electronic_energy(Vec<double> const& gamma, EnergyScale const& es, double kB_T, double filling, double mu);
     double electronic_energy(arma::vec const& evals, double kB_T, double filling);
     
-    
     template <typename T>
     class Engine {
     public:
@@ -130,96 +137,6 @@ namespace fkpm {
         // REQUIREMENT: moments() must have been called previously.
         virtual void autodiff_matrix(Vec<double> const& c, SpMatCsr<T>& D) = 0;
         
-        Vec<double> moments2(int M) {
-            arma::SpMat<T> Hs_a = this->Hs.to_arma();
-            int n = this->R.n_rows;
-            int s = this->R.n_cols;
-            // assert(this->Hs.n_rows == n && this->Hs.n_cols == n);
-            
-            arma::Mat<T> a0(n, s);
-            arma::Mat<T> a1 = this->R;
-            arma::Mat<T> a2 = Hs_a * this->R;
-            
-            Vec<double> mu(M);
-            mu[0] = n;
-            mu[1] = std::real(arma::trace(Hs_a));
-            
-            for (int m = 1; m < M/2; m++) {
-                a0 = a1;
-                a1 = a2;
-                a2 = 2*Hs_a*a1 - a0;
-                // a1 = \alpha_m, a2 = \alpha_{m+1}
-                mu[2*m]   = 2 * std::real(arma::cdot(a1, a1)) - mu[0];
-                mu[2*m+1] = 2 * std::real(arma::cdot(a2, a1)) - std::real(arma::cdot(this->R, Hs_a * this->R)); // - mu[1]; // junk
-            }
-            
-            return mu;
-        }
-        
-        void autodiff2(Vec<double> const& c, SpMatCsr<T>& D) {
-            arma::SpMat<T> Hs_a = this->Hs.to_arma();
-            int n = this->R.n_rows;
-            int s = this->R.n_cols;
-            // assert(this->Hs.n_rows == n && this->Hs.n_cols == n);
-            int M = c.size();
-            
-            double diag = c[1];
-            for (int m = 1; m < M/2; m++) {
-                // junk
-                // diag -= c[2*m+1];
-            }
-            for (int k = 0; k < D.size(); k++) {
-                D.val[k] = (D.row_idx[k] == D.col_idx[k]) ? diag : 0;
-            }
-            
-            arma::Mat<T> a0(n, s);
-            arma::Mat<T> a1 = this->R;
-            arma::Mat<T> a2 = Hs_a * this->R;
-            
-            for (int m = 1; m < M/2; m++) {
-                a0 = a1;
-                a1 = a2;
-                a2 = 2*Hs_a*a1 - a0;
-            }
-            
-            a0 = a1; // \alpha_{M/2-1}
-            a1 = a2; // \alpha_{M/2}
-            
-            arma::Mat<T> b0 = 2 * c[M-1] * a1;          // \beta_{M/2}
-            arma::Mat<T> b1(n, s, arma::fill::zeros);   // \beta_{M/2+1}
-            arma::Mat<T> b2(n, s);
-            
-            for (int m = M/2-1; m >= 1; m--) {
-                // a0 = \alpha_m,     b0 = \beta_{m+1}
-                // a1 = \alpha_{m+1}  b1 = \beta_{m+2}
-                for (int k = 0; k < D.size(); k++) {
-                    // \alpha_m \beta_{m+1}^\dagger
-                    D.val[k] += 2.0 * arma::cdot(b0.row(D.col_idx[k]), a0.row(D.row_idx[k]));
-                    
-                    // junk
-                    D.val[k] -= c[2*m+1] * arma::cdot(this->R.row(D.col_idx[k]), this->R.row(D.row_idx[k]));
-                }
-                
-                a2 = a1;
-                a1 = a0;
-                a0 = 2*Hs_a*a1 - a2;
-                
-                b2 = b1;
-                b1 = b0;
-                b0 = 4*c[2*m]*a1 + 2*c[2*m+1]*a2 + 2*Hs_a*b1 - b2;
-                if (m > 1) {
-                    b0 += 2*c[2*m-1]*a0;
-                }
-            }
-            
-            // a0 = \alpha_0, b0 = \beta_1,
-            for (int k = 0; k < D.size(); k++) {
-                D.val[k] += arma::cdot(b0.row(D.col_idx[k]), a0.row(D.row_idx[k]));
-            }
-            for (T& v: D.val) {
-                v /= this->es.mag();
-            }
-        }
     };
     
     // CPU engine
