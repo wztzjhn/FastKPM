@@ -16,8 +16,6 @@
 
 
 namespace fkpm {
-    static const double Pi = 3.141592653589793238463;
-    
     std::ostream& operator<< (std::ostream& stream, EnergyScale const& es) {
         return stream << "< lo = " << es.lo << " hi = " << es.hi << " >\n";
     }

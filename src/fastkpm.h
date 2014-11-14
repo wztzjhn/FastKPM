@@ -21,6 +21,9 @@ namespace fkpm {
     template <typename T>   T conj(T x);
     template <>             inline cx_double conj(cx_double x) { return std::conj(x); }
     template <>             inline double conj(double x) { return x; }
+    
+    constexpr double Pi = 3.141592653589793238463;
+    constexpr cx_double I(0, 1);
 }
 
 #include "spmat.h"
