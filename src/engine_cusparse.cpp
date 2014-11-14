@@ -227,30 +227,34 @@ namespace fkpm {
                                (cuComplex *)C_d.ptr, n)); // (C, C rows)
         }
         
-        
         Vec<double> moments(int M) {
             TRY(cudaSetDevice(device));
             
             assert(Hs.n_rows == R.n_rows && Hs.n_cols == R.n_rows);
+            assert(M % 2 == 0);
             
             Vec<double> mu(M);
-            mu[0] = Hs.n_rows;  // Tr[T_0[H]] = Tr[1]
-            mu[1] = Hs_trace;   // Tr[T_1[H]] = Tr[H]
+            mu[0] = Hs.n_rows;
+            mu[1] = Hs_trace;
             
-            a_d[0].from_device(R_d);            // a0 = T_0[H] R = R
-            cgemm_H(1, R_d, 0, a_d[1]);         // a1 = T_1[H] R = H R
+            a_d[0].from_device(R_d);            // a0 = \alpha_0 = R
+            cgemm_H(1, R_d, 0, a_d[1]);         // a1 = \alpha_1 = H R
             
-            for (int m = 2; m < M; m++) {
+            for (int m = 1; m < M/2; m++) {
                 a_d[2].from_device(a_d[0]);
-                cgemm_H(2, a_d[1], -1, a_d[2]); // a2 = T_m[H] R = 2 H a1 - a0
-                
-                mu[m] = cublasCdotc(R.size(), (cuComplex *)R_d.ptr, 1, (cuComplex *)a_d[2].ptr, 1).x; // R^\dag \dot alpha_2
+                cgemm_H(2, a_d[1], -1, a_d[2]); // a2 = 2 H a1 - a0
                 
                 auto temp = a_d[0];
                 a_d[0] = a_d[1];
                 a_d[1] = a_d[2];
                 a_d[2] = temp;
+                
+                // \alpha_m^\dagger \alpha_m - mu0
+                mu[2*m]   = cublasCdotc(R.size(), (cuComplex *)a_d[0].ptr, 1, (cuComplex *)a_d[0].ptr, 1).x - mu[0];
+                // \alpha_{m+1}^\dagger \alpha_m - mu1
+                mu[2*m+1] = cublasCdotc(R.size(), (cuComplex *)a_d[1].ptr, 1, (cuComplex *)a_d[0].ptr, 1).x - mu[1];
             }
+            
             return mu;
         }
         
@@ -291,30 +295,44 @@ namespace fkpm {
             outer_product(R.n_rows, R.n_cols, 0.5, (cuFloatComplex *)xi_d.ptr, (cuFloatComplex *)R_d.ptr,
                           D.size(), DRowIndex_d.ptr, DColIndex_d.ptr, (cuFloatComplex *)DVal_d.ptr);
             device_to_host_cx(DVal_d, D.val.data());
+            
+            a_d[0].memset(0);
+            a_d[1].memset(0);
         }
         
         void autodiff_matrix(Vec<double> const& c, SpMatCsr<cx_double>& D) {
-            // need special logic since mu[1] was calculated exactly
-            for (int k = 0; k < D.size(); k++) {
-                D.val[k] = (D.row_idx[k] == D.col_idx[k]) ? c[1] : 0;
+            int M = c.size();
+            int n = R.n_rows;
+            int s = R.n_cols;
+            
+            double diag = c[1];
+            for (int m = 1; m < M/2; m++) {
+                diag -= c[2*m+1];
             }
-            auto cp = [&](int m) { return (m == 1) ? 0 : c[m]; };
+            for (int k = 0; k < D.size(); k++) {
+                D.val[k] = (D.row_idx[k] == D.col_idx[k]) ? diag : 0;
+            }
             
             DRowIndex_d.from_host(D.row_idx.size(), D.row_idx.data());
             DColIndex_d.from_host(D.col_idx.size(), D.col_idx.data());
             host_to_device_cx(D.val.data(), D.val.size(), DVal_d);
             
-            int M = c.size();
-            b_d[1].memset(0);                             // b1 = 0
-            b_d[0].from_device(R_d);                      // b0 = c(M-1) R
-            cublasCscal(b_d[0].size, make_cuComplex(cp(M-1), 0), (cuComplex *)b_d[0].ptr, 1);
+            // b1 = \beta_{M/2+1}, b0 = \beta_{M/2}
+            b_d[1].memset(0);
+            if (M <= 2) {
+                b_d[0].memset(0);
+            }
+            else {
+                // b0 = 2 c[M-1] a1
+                b_d[0].from_device(a_d[1]);
+                cublasCscal(b_d[0].size, make_cuComplex(2*c[M-1], 0), (cuComplex *)b_d[0].ptr, 1);
+            }
             
-            for (int m = M-2; m >= 0; m--) {
-                // a0 = alpha_{m}
-                // b0 = beta_{m}
-                double scale = (m == 0) ? 1 : 2;
-                // D_ij += scale a0_ik conj(\b0_jk)
-                outer_product(R.n_rows, R.n_cols, scale, (cuFloatComplex *)a_d[0].ptr, (cuFloatComplex *)b_d[0].ptr,
+            for (int m = M/2-1; m >= 1; m--) {
+                // a0 = \alpha_m, b0 = \beta_{m+1}
+                
+                // D += 2 \alpha_m \beta_{m+1}^\dagger
+                outer_product(n, s, 2, (cuFloatComplex *)a_d[0].ptr, (cuFloatComplex *)b_d[0].ptr,
                               D.size(), DRowIndex_d.ptr, DColIndex_d.ptr, (cuFloatComplex *)DVal_d.ptr);
                 TRY(cudaPeekAtLastError());
                 TRY(cudaDeviceSynchronize());
@@ -327,23 +345,47 @@ namespace fkpm {
                 a_d[0].from_device(a_d[2]);
                 cgemm_H(2, a_d[1], -1, a_d[0]); // a0 = 2 H a1 - a2
                 
-                // (b0, b1, b2) <= (2 H b1 - b2 + c(m) r, a0, a1)
+                // (b0, b1, b2) <= (2 H b1 - b2, a0, a1)
                 temp = b_d[2];
                 b_d[2] = b_d[1];
                 b_d[1] = b_d[0];
                 b_d[0] = temp;
                 b_d[0].from_device(b_d[2]);
-                cgemm_H(2, b_d[1], -1, b_d[0]); // b0 = 2 H b1 - b2
-                cublasCaxpy(R.size(),           // b0 += c(m) r
-                            make_cuComplex(cp(m), 0),
-                            (cuComplex *)R_d.ptr, 1,
+                cgemm_H(2, b_d[1], -1, b_d[0]);
+                
+                // b0 += 4*c[2*m]*a1
+                cublasCaxpy(b_d[0].size,
+                            make_cuComplex(4*c[2*m], 0),
+                            (cuComplex *)a_d[1].ptr, 1,
                             (cuComplex *)b_d[0].ptr, 1);
+                // b0 += 2*c[2*m+1]*a2
+                cublasCaxpy(b_d[0].size,
+                            make_cuComplex(2*c[2*m+1], 0),
+                            (cuComplex *)a_d[2].ptr, 1,
+                            (cuComplex *)b_d[0].ptr, 1);
+                // b0 += 2*c[2*m-1]*a0
+                if (m > 1) {
+                    cublasCaxpy(b_d[0].size,
+                                make_cuComplex(2*c[2*m-1], 0),
+                                (cuComplex *)a_d[0].ptr, 1,
+                                (cuComplex *)b_d[0].ptr, 1);
+                }
             }
             
+            // D += \alpha_0 \beta_1^\dagger
+            outer_product(n, s, 1, (cuFloatComplex *)a_d[0].ptr, (cuFloatComplex *)b_d[0].ptr,
+                          D.size(), DRowIndex_d.ptr, DColIndex_d.ptr, (cuFloatComplex *)DVal_d.ptr);
+            TRY(cudaPeekAtLastError());
+            TRY(cudaDeviceSynchronize());
+            
             device_to_host_cx(DVal_d, D.val.data());
+            D.symmetrize();
             for (cx_double& v: D.val) {
                 v /= this->es.mag();
             }
+            
+            a_d[0].memset(0);
+            a_d[1].memset(0);
         }
     };
     

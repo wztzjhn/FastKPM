@@ -83,7 +83,7 @@ namespace fkpm {
             arma::Mat<T> b1(n, s, arma::fill::zeros);   // \beta_{M/2+1}
             arma::Mat<T> b0(n, s, arma::fill::zeros);   // \beta_{M/2}
             if (M > 2)
-                b0 += 2 * c[M-1] * a1;
+                b0 = 2 * c[M-1] * a1;
             
             for (int m = M/2-1; m >= 1; m--) {
                 // a0 = \alpha_m, b0 = \beta_{m+1}
