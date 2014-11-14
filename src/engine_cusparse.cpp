@@ -249,10 +249,10 @@ namespace fkpm {
                 a_d[1] = a_d[2];
                 a_d[2] = temp;
                 
-                // \alpha_m^\dagger \alpha_m - mu0
-                mu[2*m]   = cublasCdotc(R.size(), (cuComplex *)a_d[0].ptr, 1, (cuComplex *)a_d[0].ptr, 1).x - mu[0];
-                // \alpha_{m+1}^\dagger \alpha_m - mu1
-                mu[2*m+1] = cublasCdotc(R.size(), (cuComplex *)a_d[1].ptr, 1, (cuComplex *)a_d[0].ptr, 1).x - mu[1];
+                // 2 \alpha_m^\dagger \alpha_m - mu0
+                mu[2*m]   = 2 * cublasCdotc(R.size(), (cuComplex *)a_d[0].ptr, 1, (cuComplex *)a_d[0].ptr, 1).x - mu[0];
+                // 2 \alpha_{m+1}^\dagger \alpha_m - mu1
+                mu[2*m+1] = 2 * cublasCdotc(R.size(), (cuComplex *)a_d[1].ptr, 1, (cuComplex *)a_d[0].ptr, 1).x - mu[1];
             }
             
             return mu;
