@@ -1,9 +1,10 @@
 set(KPM_SRC
-  timer.cpp
+  spmat.cpp
   fastkpm.cpp
   engine.cpp
   engine_cpu.cpp
   engine_cusparse.cpp
+  timer.cpp
 )
 
 set(KPM_INCLUDE

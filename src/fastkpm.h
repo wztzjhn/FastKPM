@@ -24,20 +24,44 @@ namespace fkpm {
     
     constexpr double Pi = 3.141592653589793238463;
     constexpr cx_double I(0, 1);
-}
-
-#include "spmat.h"
-
-namespace fkpm {
     
-    class Timer {
+    
+    // -- spmat.cpp ------------------------------------------------------------------------
+    
+    // Sparse matrix in Coordinate list format
+    template <typename T>
+    class SpMatElems {
     public:
-        std::chrono::time_point<std::chrono::system_clock> t0;
-        Timer();
-        void reset();
-        double measure();
+        Vec<int> row_idx, col_idx;
+        Vec<T> val;
+        int size() const;
+        void clear();
+        void add(int i, int j, T v);
     };
-    extern Timer timer[10];
+    // Sparse matrix in Compressed Sparse Row format
+    template <typename T>
+    class SpMatCsr {
+    public:
+        int n_rows = 0, n_cols = 0;
+        Vec<int> row_idx, col_idx, row_ptr;
+        Vec<T> val;
+        Vec<int> sorted_ptrs;
+        SpMatCsr();
+        SpMatCsr(int n_rows, int n_cols, SpMatElems<T> const& that);
+        int size() const;
+        void clear();
+        int find_index(int i, int j) const;
+        T& operator()(int i, int j);
+        T const& operator()(int i, int j) const;
+        void build(int n_rows, int n_cols, SpMatElems<T> const& elems);
+        void zeros();
+        void symmetrize();
+        arma::SpMat<T> to_arma() const;
+        arma::Mat<T> to_arma_dense() const;
+    };
+    
+    
+    // -- fastkpm.cpp ------------------------------------------------------------------------
     
     // Scale eigenvalues within range (-1, +1)
     struct EnergyScale {
@@ -102,6 +126,9 @@ namespace fkpm {
     double electronic_energy(Vec<double> const& gamma, EnergyScale const& es, double kT, double filling, double mu);
     double electronic_energy(arma::vec const& evals, double kT, double filling);
     
+    
+    // -- engine*.cpp ------------------------------------------------------------------------
+    
     template <typename T>
     class Engine {
     public:
@@ -155,6 +182,18 @@ namespace fkpm {
     std::shared_ptr<Engine<T>> mk_engine();
     std::shared_ptr<Engine<double>> mk_engine_re();
     std::shared_ptr<Engine<cx_double>> mk_engine_cx();
+    
+    
+    // -- timer.cpp ------------------------------------------------------------------------
+    
+    class Timer {
+    public:
+        std::chrono::time_point<std::chrono::system_clock> t0;
+        Timer();
+        void reset();
+        double measure();
+    };
+    extern Timer timer[10];
 }
 
 #endif /* defined(__fastkpm__) */
