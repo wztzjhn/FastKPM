@@ -196,12 +196,9 @@ namespace fkpm {
     }
     
     double filling_to_mu(Vec<double> const& gamma, EnergyScale const& es, double kT, double filling, double delta_filling) {
-        // assert(kT > 0 && "filling_to_mu() requires thermal smearing");
-        static bool printed_error = false;
-        if (kT == 0 && !printed_error) {
-            std::cerr << "filling_to_mu() requires thermal smearing!\n";
-            printed_error = true;
-        }
+        // thermal smearing for faster convergence
+        kT = std::max(kT, 0.1*es.mag()/gamma.size());
+
         auto f1 = [&](double x) { return mu_to_filling(gamma, es, kT, x) - (filling+delta_filling); };
         auto f2 = [&](double x) { return mu_to_filling(gamma, es, kT, x) - (filling-delta_filling); };
         if (delta_filling == 0) {
