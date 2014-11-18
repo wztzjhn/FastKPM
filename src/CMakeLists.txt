@@ -16,9 +16,7 @@ else()
   add_library(fastkpm SHARED ${KPM_SRC})
 endif()
 target_link_libraries(fastkpm ${LIBS})
-
 set_target_properties(fastkpm PROPERTIES PUBLIC_HEADER "${KPM_INCLUDE}")
-# set_target_properties(fastkpm PROPERTIES IMPORTED_LINK_DEPENDENT_LIBRARIES "${LIBS}")
 
 # Add the fastkpm library and headers to the "export-set"
 install(TARGETS fastkpm

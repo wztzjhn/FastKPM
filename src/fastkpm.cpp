@@ -9,6 +9,7 @@
 // #include <cstdlib>
 #include <cassert>
 #include <algorithm>
+#include <boost/math/tools/roots.hpp>
 #ifdef WITH_TBB
 #include <tbb/tbb.h>
 #endif
@@ -151,88 +152,92 @@ namespace fkpm {
         }
     }
     
-    double fermi_energy(double x, double kB_T, double mu) {
-        double alpha = (x-mu)/std::abs(kB_T);
-        if (kB_T == 0.0 || std::abs(alpha) > 20) {
+    double fermi_energy(double x, double kT, double mu) {
+        double alpha = (x-mu)/std::abs(kT);
+        if (kT == 0.0 || std::abs(alpha) > 20) {
             return (x < mu) ? (x-mu) : 0.0;
         }
         else {
-            return -kB_T*log(1 + exp(-alpha));
+            return -kT*log(1 + exp(-alpha));
         }
     }
     
-    double fermi_density(double x, double kB_T, double mu) {
-        double alpha = (x-mu)/std::abs(kB_T);
-        if (kB_T == 0.0 || std::abs(alpha) > 20) {
+    double fermi_density(double x, double kT, double mu) {
+        double alpha = (x-mu)/std::abs(kT);
+        if (kT == 0.0 || std::abs(alpha) > 20) {
             return (x < mu) ? 1.0 : 0.0;
         }
         else {
             return 1.0/(exp(alpha)+1.0);
         }
     }
-
-    double mu_to_filling(Vec<double> const& gamma, EnergyScale const& es, double kB_T, double mu) {
+    
+    double mu_to_filling(Vec<double> const& gamma, EnergyScale const& es, double kT, double mu) {
         using std::placeholders::_1;
-        double n_occ = density_product(gamma, std::bind(fermi_density, _1, kB_T, mu), es);
+        double n_occ = density_product(gamma, std::bind(fermi_density, _1, kT, mu), es);
         double n_tot = density_product(gamma, [](double x){return 1;}, es);
         return n_occ/n_tot;
     }
-    double mu_to_filling(arma::vec const& evals, double kB_T, double mu) {
+    double mu_to_filling(arma::vec const& evals, double kT, double mu) {
         double n_occ = 0;
         double n_tot = evals.size();
         for (double const& x : evals) {
-            n_occ += fermi_density(x, kB_T, mu);
+            n_occ += fermi_density(x, kT, mu);
         }
         return n_occ/n_tot;
     }
     
-    // TODO: use modified newton method at finite temperature.
-    double filling_to_mu(Vec<double> const& gamma, EnergyScale const& es, double kB_T, double filling, double delta_filling) {
-        assert(kB_T == 0);
-        assert(gamma.size() >= 3);
-        assert(0 <= filling && filling <= 1.0);
-        assert(delta_filling >= 0);
-        Vec<double> x, irho;
-        integrated_density_function(gamma, es, x, irho);
-        double n_tot = density_product(gamma, [](double x){return 1;}, es);
-        double n1 = n_tot * std::max(filling - delta_filling, 0.0);
-        double n2 = n_tot * std::min(filling + delta_filling, 1.0);
-        int i1 = std::find_if(irho.begin(), irho.end(), [&](double x){return x > n1;}) - irho.begin();
-        int i2 = std::find_if(irho.begin(), irho.end(), [&](double x){return x > n2;}) - irho.begin();
-        i1 = std::min<int>(std::max(i1, 1), irho.size()-1);
-        i2 = std::min<int>(std::max(i2, 1), irho.size()-1);
-        return (x[i1] + x[i1-1] + x[i2] + x[i2-1]) / 4.0;
-    }
-    double filling_to_mu(arma::vec const& evals, double kB_T, double filling) {
-        assert(kB_T > 0 && "filling_to_mu() requires thermal smearing");
-        std::abort();
-//        auto evals_sorted = evals;
-//        std::sort(evals_sorted.begin(), evals_sorted.end());
-//        int n_occ = int(filling*evals.size() + 0.5);
-//        assert(n_occ >= 1 && n_occ < evals.size());
-//        return 0.5 * (evals_sorted[n_occ-1] + evals_sorted[n_occ]);
+    static double root_solver(std::function<double(double)> f, double lo, double hi) {
+        int precision_bits = 30;
+        boost::math::tools::eps_tolerance<double> tol(precision_bits);
+        boost::uintmax_t max_iter=50;
+        auto bds = boost::math::tools::toms748_solve(f, lo, hi, tol, max_iter);
+        return 0.5 * (bds.first + bds.second);
     }
     
-    double electronic_grand_energy(Vec<double> const& gamma, EnergyScale const& es, double kB_T, double mu) {
-        using std::placeholders::_1;
-        return density_product(gamma, std::bind(fermi_energy, _1, kB_T, mu), es);
+    double filling_to_mu(Vec<double> const& gamma, EnergyScale const& es, double kT, double filling, double delta_filling) {
+        // assert(kT > 0 && "filling_to_mu() requires thermal smearing");
+        static bool printed_error = false;
+        if (kT == 0 && !printed_error) {
+            std::cerr << "filling_to_mu() requires thermal smearing!\n";
+            printed_error = true;
+        }
+        auto f1 = [&](double x) { return mu_to_filling(gamma, es, kT, x) - (filling+delta_filling); };
+        auto f2 = [&](double x) { return mu_to_filling(gamma, es, kT, x) - (filling-delta_filling); };
+        if (delta_filling == 0) {
+            return root_solver(f1, es.lo, es.hi);
+        }
+        else {
+            return 0.5 * (root_solver(f1, es.lo, es.hi) + root_solver(f2, es.lo, es.hi));
+        }
     }
-    double electronic_grand_energy(arma::vec const& evals, double kB_T, double mu) {
+    double filling_to_mu(arma::vec const& evals, double kT, double filling) {
+        assert(kT > 0 && "filling_to_mu() requires thermal smearing!");
+        auto f = [&](double x) { return mu_to_filling(evals, kT, x) - filling; };
+        auto minmax = std::minmax_element(evals.begin(), evals.end());
+        return root_solver(f, *minmax.first, *minmax.second);
+    }
+    
+    double electronic_grand_energy(Vec<double> const& gamma, EnergyScale const& es, double kT, double mu) {
+        using std::placeholders::_1;
+        return density_product(gamma, std::bind(fermi_energy, _1, kT, mu), es);
+    }
+    double electronic_grand_energy(arma::vec const& evals, double kT, double mu) {
         double acc = 0;
         for (double const& x : evals) {
-            acc += fermi_energy(x, kB_T, mu);
+            acc += fermi_energy(x, kT, mu);
         }
         return acc;
     }
     
-    double electronic_energy(Vec<double> const& gamma, EnergyScale const& es, double kB_T, double filling, double mu) {
+    double electronic_energy(Vec<double> const& gamma, EnergyScale const& es, double kT, double filling, double mu) {
         double n_tot = density_product(gamma, [](double x){return 1;}, es);
         double n_occ = filling*n_tot;
-        return electronic_grand_energy(gamma, es, kB_T, mu) + mu*n_occ;
+        return electronic_grand_energy(gamma, es, kT, mu) + mu*n_occ;
     }
-    double electronic_energy(arma::vec const& evals, double kB_T, double filling) {
+    double electronic_energy(arma::vec const& evals, double kT, double filling) {
         // at zero temperature, need special logic to correctly count degenerate eigenvalues
-        if (kB_T == 0) {
+        if (kT == 0) {
             auto evals_sorted = evals;
             std::sort(evals_sorted.begin(), evals_sorted.end());
             int n_occ = int(filling*evals.size() + 0.5);
@@ -246,8 +251,8 @@ namespace fkpm {
         else {
             double n_tot = evals.size();
             double n_occ = filling*n_tot;
-            double mu = filling_to_mu(evals, kB_T, filling);
-            return electronic_grand_energy(evals, kB_T, mu) + mu*n_occ;
+            double mu = filling_to_mu(evals, kT, filling);
+            return electronic_grand_energy(evals, kT, mu) + mu*n_occ;
         }
     }
 }

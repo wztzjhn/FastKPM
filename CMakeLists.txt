@@ -69,6 +69,11 @@ if (CUDA_FOUND)
     set(CUDA_PROPAGATE_HOST_FLAGS OFF)
 endif()
 
+# Boost
+find_package(Boost 1.55.0 REQUIRED)
+include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
+
+
 if (WITH_MPI)
     # MPI
     find_package(MPI REQUIRED)
