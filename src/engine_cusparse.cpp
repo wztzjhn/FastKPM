@@ -390,6 +390,18 @@ namespace fkpm {
     };
     
     
+    static void printDeviceProperties(int device) {
+        cudaDeviceProp prop;
+        cudaGetDeviceProperties(&prop, device);
+        std::cout << "Using device " << device << std::endl;
+        std::cout << "  Device name:           " << prop.name << "\n";
+        std::cout << "  Total global memory:   " << prop.totalGlobalMem/(1024.*1024.*1024.) << " (GB)\n";
+        std::cout << "  Peak memory bandwidth: " << 2.0*prop.memoryClockRate*(prop.memoryBusWidth/8)/1.0e6 << " (GB/s)\n";
+        // std::cout << "  Memory clock rate:     " << prop.memoryClockRate/1000. << " (GHz)\n";
+        // std::cout << "  Memory bus width:      " << prop.memoryBusWidth << " (bits)\n";
+        std::cout << "\n";
+    }
+    
     template <typename T>
     std::shared_ptr<Engine<T>> mk_engine_cuSPARSE(int device) {
         int count;
@@ -397,6 +409,7 @@ namespace fkpm {
         switch (err) {
             case cudaSuccess:
                 if (device < count) {
+                    // printDeviceProperties(device);
                     return std::make_shared<Engine_cuSPARSE<T>>(device);
                 }
                 else {
