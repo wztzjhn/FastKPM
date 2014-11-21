@@ -145,8 +145,6 @@ namespace fkpm {
     template <typename T>
     class Engine {
     public:
-        EnergyScale es;        // Scaling bounds
-        SpMatCsr<T> Hs;        // Scaled Hamiltonian
         arma::Mat<T> R;        // Random vectors
         
         // Uncorrelated random elements
@@ -158,14 +156,11 @@ namespace fkpm {
         // Identity matrix
         void set_R_identity(int n);
         
-        // Set Hamiltonian and energy scale
-        void set_H(SpMatCsr<T> const& H, EnergyScale const& es);
-        
         // Transfer R matrix to device
         virtual void transfer_R() {}
         
-        // Transfer H matrix to device
-        virtual void transfer_H() {}
+        // Set Hamiltonian and energy scale
+        virtual void set_H(SpMatCsr<T> const& H, EnergyScale const& es) = 0;
         
         // Chebyshev moments: mu_m = tr T_m(Hs) ~ tr R^\dagger T_m(Hs) R
         virtual Vec<double> moments(int M) = 0;

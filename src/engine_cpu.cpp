@@ -6,10 +6,25 @@
 namespace fkpm {
     template <typename T>
     class Engine_CPU: public Engine<T> {
+        EnergyScale es;        // Scaling bounds
+        SpMatCsr<T> Hs;        // Scaled Hamiltonian
         arma::Mat<T> a0;
         arma::Mat<T> a1;
         arma::Mat<T> a2;
         
+        
+        void set_H(SpMatCsr<T> const& H, EnergyScale const& es) {
+            assert(H.n_rows == H.n_cols);
+            this->es = es;
+            this->Hs = H;
+            for (int i = 0; i < Hs.n_rows; i++) {
+                Hs(i, i) -= es.avg();
+            }
+            for (T& v: Hs.val) {
+                v /= es.mag();
+            }
+        }
+
         Vec<double> moments(int M) {
             arma::SpMat<T> Hs_a = this->Hs.to_arma();
             int n = this->R.n_rows;

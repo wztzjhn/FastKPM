@@ -127,8 +127,11 @@ namespace fkpm {
     class Engine_cuSPARSE<cx_double>: public Engine<cx_double> {
     public:
         int device = 0;
-        int n_nonzero = 0;
+        EnergyScale es;
+        int Hs_n_rows = 0;
+        int Hs_n_nonzero = 0;
         double Hs_trace = 0;
+        Vec<cx_float> Hs_val;
         
         cusparseHandle_t cs_handle;
         cusparseMatDescr_t cs_mat_descr;
@@ -198,18 +201,30 @@ namespace fkpm {
             }
         }
         
-        void transfer_H() {
+        void set_H(SpMatCsr<cx_double> const& H, EnergyScale const& es) {
             TRY(cudaSetDevice(device));
             
-            n_nonzero = Hs.size();
-            Hs_trace = 0;
-            for (int i = 0; i < Hs.n_rows; i++) {
-                Hs_trace += std::real(Hs(i, i));
-            }
+            assert(H.n_rows == H.n_cols);
             
-            HRowPtr_d.from_host(Hs.row_ptr.size(), Hs.row_ptr.data());
-            HColIndex_d.from_host(Hs.col_idx.size(), Hs.col_idx.data());
-            host_to_device_cx(Hs.val.data(), n_nonzero, HVal_d);
+            this->es = es;
+            Hs_n_rows = H.n_rows;
+            Hs_n_nonzero = H.size();
+            Hs_val.resize(Hs_n_nonzero);
+            Hs_trace = 0;
+            int diag_cnt = 0;
+            for (int k = 0; k < H.size(); k++) {
+                Hs_val[k] = H.val[k] / es.mag();
+                if (H.row_idx[k] == H.col_idx[k]) {
+                    Hs_val[k] -= es.avg() / es.mag();
+                    Hs_trace += std::real(Hs_val[k]);
+                    diag_cnt++;
+                }
+            }
+            assert(diag_cnt == H.n_rows);
+            
+            HRowPtr_d.from_host(H.row_ptr.size(), H.row_ptr.data());
+            HColIndex_d.from_host(H.col_idx.size(), H.col_idx.data());
+            HVal_d.from_host(Hs_val.size(), Hs_val.data());
         }
         
         // C = alpha H B + beta C
@@ -219,7 +234,7 @@ namespace fkpm {
             auto alpha_f = make_cuComplex(alpha.real(), alpha.imag());
             auto beta_f  = make_cuComplex(beta.real(),  beta.imag());
             TRY(cusparseCcsrmm(cs_handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
-                               n, s, n, n_nonzero, // (H rows, B cols, H cols, H nnz)
+                               n, s, n, Hs_n_nonzero, // (H rows, B cols, H cols, H nnz)
                                &alpha_f,
                                cs_mat_descr, (cuComplex *)HVal_d.ptr, HRowPtr_d.ptr, HColIndex_d.ptr, // H matrix
                                (cuComplex *)B_d.ptr, n, // (B, B rows)
@@ -230,11 +245,11 @@ namespace fkpm {
         Vec<double> moments(int M) {
             TRY(cudaSetDevice(device));
             
-            assert(Hs.n_rows == R.n_rows && Hs.n_cols == R.n_rows);
+            assert(Hs_n_rows == R.n_rows);
             assert(M % 2 == 0);
             
             Vec<double> mu(M);
-            mu[0] = Hs.n_rows;
+            mu[0] = Hs_n_rows;
             mu[1] = Hs_trace;
             
             a_d[0].from_device(R_d);            // a0 = \alpha_0 = R
@@ -261,7 +276,7 @@ namespace fkpm {
         void stoch_matrix(Vec<double> const& c, SpMatCsr<cx_double>& D) {
             TRY(cudaSetDevice(device));
             
-            assert(Hs.n_rows == R.n_rows && Hs.n_cols == R.n_rows);
+            assert(Hs_n_rows == R.n_rows);
             
             a_d[0].from_device(R_d);            // a0 = T_0[H] R = R
             cgemm_H(1, R_d, 0, a_d[1]);         // a1 = T_1[H] R = H R

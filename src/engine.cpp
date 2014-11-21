@@ -65,20 +65,6 @@ namespace fkpm {
         transfer_R();
     }
     
-    template <typename T>
-    void Engine<T>::set_H(SpMatCsr<T> const& H, EnergyScale const& es) {
-        assert(H.n_rows == H.n_cols);
-        this->es = es;
-        this->Hs = H;
-        for (int i = 0; i < Hs.n_rows; i++) {
-            Hs(i, i) -= es.avg();
-        }
-        for (T& v: Hs.val) {
-            v /= es.mag();
-        }
-        transfer_H();
-    }
-    
     
     template class Engine<double>;
     template class Engine<cx_double>;
