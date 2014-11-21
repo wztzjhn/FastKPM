@@ -13,6 +13,8 @@ namespace fkpm {
         std::uniform_int_distribution<uint32_t> dist2(0,1);
         return double(dist2(rng));
     }
+    template <>
+    float random_phase(RNG& rng) { return float(random_phase<double>(rng)); }
     
     // Random number from {+1, i, -1, -i}
     template <>
@@ -26,12 +28,13 @@ namespace fkpm {
         }
         assert(false);
     }
-
+    template <>
+    cx_float random_phase(RNG& rng) { return cx_float(random_phase<double>(rng)); }
     
     template <typename T>
     void Engine<T>::set_R_uncorrelated(int n, int s, RNG& rng) {
         R.set_size(n, s);
-        double x = 1.0 / sqrt(s);
+        T x = 1.0 / sqrt(s);
         for (int i = 0; i < n; i++) {
             for (int j = 0; j < s; j++) {
                 R(i, j) = random_phase<T>(rng) * x;
@@ -66,7 +69,9 @@ namespace fkpm {
     }
     
     
+    template class Engine<float>;
     template class Engine<double>;
+    template class Engine<cx_float>;
     template class Engine<cx_double>;
     
     
@@ -80,12 +85,4 @@ namespace fkpm {
     }
     template std::shared_ptr<Engine<double>> mk_engine();
     template std::shared_ptr<Engine<cx_double>> mk_engine();
-    
-    std::shared_ptr<Engine<double>> mk_engine_re() {
-        return mk_engine<double>();
-    }
-    
-    std::shared_ptr<Engine<cx_double>> mk_engine_cx() {
-        return mk_engine<cx_double>();
-    }
 }

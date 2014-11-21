@@ -18,13 +18,21 @@ namespace fkpm {
     template <typename T>
     using Vec = std::vector<T>;
     
-    typedef std::complex<double> cx_double;
+    template <typename S, typename T>
+    void copy_vec(Vec<S> const& src_vec, Vec<T>& dst_vec) {
+        dst_vec.resize(src_vec.size());
+        std::copy(src_vec.begin(), src_vec.end(), dst_vec.begin());
+    };
+
     typedef std::complex<float>  cx_float;
+    typedef std::complex<double> cx_double;
     
     // complex conjugation that preserves real values
     template <typename T>   T conj(T x);
-    template <>             inline cx_double conj(cx_double x) { return std::conj(x); }
+    template <>             inline float conj(float x) { return x; }
     template <>             inline double conj(double x) { return x; }
+    template <>             inline cx_float conj(cx_float x) { return std::conj(x); }
+    template <>             inline cx_double conj(cx_double x) { return std::conj(x); }
     
     constexpr double Pi = 3.141592653589793238463;
     constexpr cx_double I(0, 1);
@@ -39,7 +47,7 @@ namespace fkpm {
     }
 #endif
     
-
+    
     // -- spmat.cpp ------------------------------------------------------------------------
     
     // Sparse matrix in Coordinate list format
@@ -73,6 +81,17 @@ namespace fkpm {
         void symmetrize();
         arma::SpMat<T> to_arma() const;
         arma::Mat<T> to_arma_dense() const;
+        
+        template<typename S>
+        SpMatCsr<T>& operator=(SpMatCsr<S> const& that) {
+            n_rows = that.n_rows;
+            n_cols = that.n_cols;
+            copy_vec(that.row_idx, row_idx);
+            copy_vec(that.col_idx, col_idx);
+            copy_vec(that.row_ptr, row_ptr);
+            copy_vec(that.val, val);
+            return *this;
+        }
     };
     
     
@@ -187,8 +206,6 @@ namespace fkpm {
     // Fastest engine available
     template <typename T>
     std::shared_ptr<Engine<T>> mk_engine();
-    std::shared_ptr<Engine<double>> mk_engine_re();
-    std::shared_ptr<Engine<cx_double>> mk_engine_cx();
     
     
     // -- timer.cpp ------------------------------------------------------------------------

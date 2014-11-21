@@ -72,7 +72,7 @@ namespace fkpm {
                 int j = D.col_idx[k];
                 T x1 = arma::cdot(this->R.row(j), xi.row(i)); // xi R^dagger
                 T x2 = arma::cdot(xi.row(j), this->R.row(i)); // R xi^dagger
-                D.val[k] = 0.5*(x1+x2);
+                D.val[k] = T(0.5)*(x1+x2);
             }
             
             // a0 and a1 matrices invalid (too large)
@@ -105,7 +105,7 @@ namespace fkpm {
                 
                 // D += 2 \alpha_m \beta_{m+1}^\dagger
                 for (int k = 0; k < D.size(); k++) {
-                    D.val[k] += 2.0 * arma::cdot(b0.row(D.col_idx[k]), a0.row(D.row_idx[k]));
+                    D.val[k] += T(2) * arma::cdot(b0.row(D.col_idx[k]), a0.row(D.row_idx[k]));
                 }
                 
                 a2 = a1;
@@ -139,6 +139,8 @@ namespace fkpm {
     std::shared_ptr<Engine<T>> mk_engine_cpu() {
         return std::make_shared<Engine_CPU<T>>();
     }
+    template std::shared_ptr<Engine<float>> mk_engine_cpu();
     template std::shared_ptr<Engine<double>> mk_engine_cpu();
+    template std::shared_ptr<Engine<cx_float>> mk_engine_cpu();
     template std::shared_ptr<Engine<cx_double>> mk_engine_cpu();
 }

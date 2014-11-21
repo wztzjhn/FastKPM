@@ -130,8 +130,8 @@ namespace fkpm {
             if (i >= j) {
                 T v1 = (*this)(i, j);
                 T v2 = (*this)(j, i);
-                (*this)(i, j) = 0.5 * (v1 + conj(v2));
-                (*this)(j, i) = 0.5 * (conj(v1) + v2);
+                (*this)(i, j) = (v1 + conj(v2)) / T(2);
+                (*this)(j, i) = (conj(v1) + v2) / T(2);
             }
         }
     }
@@ -154,9 +154,13 @@ namespace fkpm {
     
     
     // instantiations
+    template class SpMatElems<float>;
     template class SpMatElems<double>;
+    template class SpMatElems<cx_float>;
     template class SpMatElems<cx_double>;
+    template class SpMatCsr<float>;
     template class SpMatCsr<double>;
+    template class SpMatCsr<cx_float>;
     template class SpMatCsr<cx_double>;
 }
 
