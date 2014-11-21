@@ -203,7 +203,6 @@ namespace fkpm {
         
         void set_H(SpMatCsr<cx_double> const& H, EnergyScale const& es) {
             TRY(cudaSetDevice(device));
-            
             assert(H.n_rows == H.n_cols);
             
             this->es = es;
@@ -212,16 +211,17 @@ namespace fkpm {
             Hs_val.resize(Hs_n_nonzero);
             Hs_trace = 0;
             int diag_cnt = 0;
+            double es_mag_inv = 1.0 / es.mag();
+            double es_shift = es.avg() / es.mag();
             for (int k = 0; k < H.size(); k++) {
-                Hs_val[k] = H.val[k] / es.mag();
+                Hs_val[k] = H.val[k] * es_mag_inv;
                 if (H.row_idx[k] == H.col_idx[k]) {
-                    Hs_val[k] -= es.avg() / es.mag();
+                    Hs_val[k] -= es_shift;
                     Hs_trace += std::real(Hs_val[k]);
                     diag_cnt++;
                 }
             }
             assert(diag_cnt == H.n_rows);
-            
             HRowPtr_d.from_host(H.row_ptr.size(), H.row_ptr.data());
             HColIndex_d.from_host(H.col_idx.size(), H.col_idx.data());
             HVal_d.from_host(Hs_val.size(), Hs_val.data());
@@ -244,7 +244,6 @@ namespace fkpm {
         
         Vec<double> moments(int M) {
             TRY(cudaSetDevice(device));
-            
             assert(Hs_n_rows == R.n_rows);
             assert(M % 2 == 0);
             
@@ -275,7 +274,6 @@ namespace fkpm {
         
         void stoch_matrix(Vec<double> const& c, SpMatCsr<cx_double>& D) {
             TRY(cudaSetDevice(device));
-            
             assert(Hs_n_rows == R.n_rows);
             
             a_d[0].from_device(R_d);            // a0 = T_0[H] R = R
