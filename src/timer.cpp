@@ -22,7 +22,7 @@ namespace fkpm {
     double Timer::measure() {
         auto t1 = std::chrono::system_clock::now();
         std::chrono::duration<double> dt = t1 - t0;
-        t0 = t1;
+        reset();
         return dt.count();
     }
 }

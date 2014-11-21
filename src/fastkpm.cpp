@@ -6,13 +6,9 @@
 //
 //
 
-// #include <cstdlib>
 #include <cassert>
 #include <algorithm>
 #include <boost/math/tools/roots.hpp>
-#ifdef WITH_TBB
-#include <tbb/tbb.h>
-#endif
 #include "fastkpm.h"
 
 

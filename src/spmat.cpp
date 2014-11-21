@@ -1,5 +1,5 @@
-#include "fastkpm.h"
 #include <armadillo>
+#include "fastkpm.h"
 
 namespace fkpm {
     
@@ -72,35 +72,38 @@ namespace fkpm {
         col_idx.resize(elems.size());
         row_ptr.resize(n_rows+1);
         val.resize(elems.size());
-        sorted_ptrs.resize(elems.size());
-        for (int p = 0; p < size(); p++) {
-            sorted_ptrs[p] = p;
+        sorted_ptr.resize(n_rows);
+        for (auto& row: sorted_ptr) {
+            row.resize(0);
         }
-        std::sort(sorted_ptrs.begin(), sorted_ptrs.end(), [&](int p1, int p2) {
-            int i1 = elems.row_idx[p1];
-            int j1 = elems.col_idx[p1];
-            int i2 = elems.row_idx[p2];
-            int j2 = elems.col_idx[p2];
-            return (i1 < i2 || (i1 == i2 && j1 < j2));
-        });
+        for (int p = 0; p < elems.size(); p++) {
+            sorted_ptr[elems.row_idx[p]].push_back(p);
+        }
+        auto sort_row = [&](std::size_t i) {
+            std::sort(sorted_ptr[i].begin(), sorted_ptr[i].end(), [&](int p1, int p2) {
+                return elems.col_idx[p1] < elems.col_idx[p2];
+            });
+        };
+        parallel_for(0, n_rows, sort_row);
         int max_row = -1; // largest row observed
         int k = 0;        // number of unique elements observed
-        for (int p : sorted_ptrs) {
-            int i = elems.row_idx[p];
-            int j = elems.col_idx[p];
-            // if element already exists, accumulate previous value
-            if (k > 0 && row_idx[k-1] == i && col_idx[k-1] == j) {
-                val[k-1] += elems.val[p];
-            }
-            // otherwise add new element and update row_ptr
-            else {
-                row_idx[k] = i;
-                col_idx[k] = j;
-                val[k] = elems.val[p];
-                while (max_row < i) {
-                    row_ptr[++max_row] = k;
+        for (int i = 0; i < n_rows; i++) {
+            for (int p : sorted_ptr[i]) {
+                int j = elems.col_idx[p];
+                // if element already exists, accumulate previous value
+                if (k > 0 && row_idx[k-1] == i && col_idx[k-1] == j) {
+                    val[k-1] += elems.val[p];
                 }
-                k++;
+                // otherwise add new element and update row_ptr
+                else {
+                    row_idx[k] = i;
+                    col_idx[k] = j;
+                    val[k] = elems.val[p];
+                    while (max_row < i) {
+                        row_ptr[++max_row] = k;
+                    }
+                    k++;
+                }
             }
         }
         while (max_row < n_rows) {

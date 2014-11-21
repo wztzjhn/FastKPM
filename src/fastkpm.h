@@ -7,6 +7,10 @@
 #include <memory>
 #include <armadillo>
 
+#ifdef WITH_TBB
+#include <tbb/tbb.h>
+#endif
+
 
 namespace fkpm {
     typedef std::mt19937 RNG;
@@ -17,7 +21,7 @@ namespace fkpm {
     typedef std::complex<double> cx_double;
     typedef std::complex<float>  cx_float;
     
-    // complex conjugation that is valid also for real values
+    // complex conjugation that preserves real values
     template <typename T>   T conj(T x);
     template <>             inline cx_double conj(cx_double x) { return std::conj(x); }
     template <>             inline double conj(double x) { return x; }
@@ -25,7 +29,17 @@ namespace fkpm {
     constexpr double Pi = 3.141592653589793238463;
     constexpr cx_double I(0, 1);
     
+#ifdef WITH_TBB
+    inline void parallel_for(size_t start, size_t end, std::function<void(size_t)> fn) {
+        tbb::parallel_for(size_t(start),size_t(end), fn);
+    }
+#else
+    inline void parallel_for(size_t start, size_t end, std::function<void(size_t)> fn) {
+        for (int i = start; i < end; i++) { fn(i); }
+    }
+#endif
     
+
     // -- spmat.cpp ------------------------------------------------------------------------
     
     // Sparse matrix in Coordinate list format
@@ -41,11 +55,12 @@ namespace fkpm {
     // Sparse matrix in Compressed Sparse Row format
     template <typename T>
     class SpMatCsr {
+    private:
+        Vec<Vec<int>> sorted_ptr;
     public:
         int n_rows = 0, n_cols = 0;
         Vec<int> row_idx, col_idx, row_ptr;
         Vec<T> val;
-        Vec<int> sorted_ptrs;
         SpMatCsr();
         SpMatCsr(int n_rows, int n_cols, SpMatElems<T> const& that);
         int size() const;
@@ -70,10 +85,8 @@ namespace fkpm {
         double mag() const { return (hi - lo) / 2.0; }
         double scale(double x) const { return (x - avg()) / mag(); }
         double unscale(double x) const { return x * mag() + avg(); }
+        friend std::ostream& operator<< (std::ostream& stream, EnergyScale const& es);
     };
-    
-    // Print EnergyScale
-    std::ostream& operator<< (std::ostream& stream, EnergyScale const& es);
     
     // Use Lanczos to bound eigenvalues of H, and determine appropriate rescaling
     template <typename T>
@@ -166,7 +179,6 @@ namespace fkpm {
         // dg(x)/dx = D(x).
         // REQUIREMENT: moments() must have been called previously.
         virtual void autodiff_matrix(Vec<double> const& c, SpMatCsr<T>& D) = 0;
-        
     };
     
     // CPU engine
@@ -191,7 +203,7 @@ namespace fkpm {
         std::chrono::time_point<std::chrono::system_clock> t0;
         Timer();
         void reset();
-        double measure();
+        double measure(); // elapsed time in seconds
     };
     extern Timer timer[10];
 }
