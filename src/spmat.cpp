@@ -73,8 +73,8 @@ namespace fkpm {
         row_ptr.resize(n_rows+1);
         val.resize(elems.size());
         sorted_ptr.resize(n_rows);
-        for (auto& row: sorted_ptr) {
-            row.resize(0);
+        for (int i = 0; i < n_rows; i++) {
+            sorted_ptr[i].resize(0);
         }
         for (int p = 0; p < elems.size(); p++) {
             sorted_ptr[elems.row_idx[p]].push_back(p);
@@ -88,7 +88,8 @@ namespace fkpm {
         int max_row = -1; // largest row observed
         int k = 0;        // number of unique elements observed
         for (int i = 0; i < n_rows; i++) {
-            for (int p : sorted_ptr[i]) {
+            for (int l = 0; l < sorted_ptr[i].size(); l++) {
+                int p = sorted_ptr[i][l];
                 int j = elems.col_idx[p];
                 // if element already exists, accumulate previous value
                 if (k > 0 && row_idx[k-1] == i && col_idx[k-1] == j) {
@@ -116,8 +117,8 @@ namespace fkpm {
     
     template <typename T>
     void SpMatCsr<T>::zeros() {
-        for (T& v: val) {
-            v = 0;
+        for (int i = 0; i < val.size(); i++) {
+            val[i] = 0;
         }
     }
     
