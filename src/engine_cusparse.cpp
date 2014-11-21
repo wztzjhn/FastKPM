@@ -389,43 +389,44 @@ namespace fkpm {
         }
     };
     
-    
-    static void printDeviceProperties(int device) {
-        cudaDeviceProp prop;
-        cudaGetDeviceProperties(&prop, device);
-        std::cout << "Using device " << device << std::endl;
-        std::cout << "  Device name:           " << prop.name << "\n";
-        std::cout << "  Total global memory:   " << prop.totalGlobalMem/(1024.*1024.*1024.) << " (GB)\n";
-        std::cout << "  Peak memory bandwidth: " << 2.0*prop.memoryClockRate*(prop.memoryBusWidth/8)/1.0e6 << " (GB/s)\n";
-        // std::cout << "  Memory clock rate:     " << prop.memoryClockRate/1000. << " (GHz)\n";
-        // std::cout << "  Memory bus width:      " << prop.memoryBusWidth << " (bits)\n";
-        std::cout << "\n";
-    }
-    
     template <typename T>
     std::shared_ptr<Engine<T>> mk_engine_cuSPARSE(int device) {
+        std::stringstream msg;
+        static Vec<bool> printed_msg(16, false);
+        assert(device >= 0 && device < printed_msg.size());
+        std::shared_ptr<Engine<T>> ret = nullptr;
         int count;
         int err = cudaGetDeviceCount(&count);
         switch (err) {
             case cudaSuccess:
                 if (device < count) {
-                    // printDeviceProperties(device);
-                    return std::make_shared<Engine_cuSPARSE<T>>(device);
+                    cudaDeviceProp prop;
+                    cudaGetDeviceProperties(&prop, device);
+                    msg << "Using device " << device << "\n";
+                    msg << "  Device name:           " << prop.name << "\n";
+                    msg << "  Total global memory:   " << prop.totalGlobalMem/(1024.*1024.*1024.) << " (GB)\n";
+                    msg << "  Peak memory bandwidth: " << 2.0*prop.memoryClockRate*(prop.memoryBusWidth/8)/1.0e6 << " (GB/s)\n\n";
+                    ret = std::make_shared<Engine_cuSPARSE<T>>(device);
                 }
                 else {
-                    std::cerr << "Requested device " << device << " but only " << count << " are available!\n";
-                    return nullptr;
+                    msg << "Device #" << device << " exceeds availability (" << count << " devices)!\n";
                 }
+                break;
             case cudaErrorNoDevice:
-                std::cerr << "No CUDA device is available!\n";
-                return nullptr;
+                msg << "No CUDA device is available!\n";
+                break;
             case cudaErrorInsufficientDriver:
-                std::cerr << "Insufficient CUDA driver!\n";
-                return nullptr;
+                msg << "Insufficient CUDA driver!\n";
+                break;
             default:
-                std::cerr << "Unknown CUDA error " << err << "!\n";
-                return nullptr;
+                msg << "Unknown CUDA error " << err << "!\n";
+                break;
         }
+        if (!printed_msg[device]) {
+            std::cout << msg.str();
+            printed_msg[device] = true;
+        }
+        return ret;
     }
     template <>
     std::shared_ptr<Engine<double>> mk_engine_cuSPARSE(int device) {
