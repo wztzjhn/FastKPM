@@ -83,6 +83,8 @@ namespace fkpm {
             ret = mk_engine_cpu<T>();
         return ret;
     }
+    template std::shared_ptr<Engine<float>> mk_engine();
     template std::shared_ptr<Engine<double>> mk_engine();
+    template std::shared_ptr<Engine<cx_float>> mk_engine();
     template std::shared_ptr<Engine<cx_double>> mk_engine();
 }

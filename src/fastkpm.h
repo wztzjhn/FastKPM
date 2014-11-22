@@ -23,7 +23,7 @@ namespace fkpm {
         dst_vec.resize(src_vec.size());
         std::copy(src_vec.begin(), src_vec.end(), dst_vec.begin());
     };
-
+    
     typedef std::complex<float>  cx_float;
     typedef std::complex<double> cx_double;
     

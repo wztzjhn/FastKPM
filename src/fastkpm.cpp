@@ -17,22 +17,6 @@ namespace fkpm {
         return stream << "< lo = " << es.lo << " hi = " << es.hi << " >\n";
     }
     
-    // TODO: fix Armadillo's eigs_sym
-    template <>
-    EnergyScale energy_scale(SpMatCsr<double> const& H, double extra, double tolerance) {
-        arma::sp_mat H_a_re = H.to_arma();
-        arma::sp_mat H_a_im = H_a_re;
-        H_a_im.zeros();
-        arma::sp_cx_mat H_a(H_a_re, H_a_im);
-        arma::cx_vec eigval;
-        arma::eigs_gen(eigval, H_a, 1, "sr", tolerance);
-        double eig_min = eigval(0).real();
-        arma::eigs_gen(eigval, H_a, 1, "lr", tolerance);
-        double eig_max = eigval(0).real();
-        double slack = extra * (eig_max - eig_min);
-        return {eig_min-slack, eig_max+slack};
-    }
-    
     template <>
     EnergyScale energy_scale(SpMatCsr<cx_double> const& H, double extra, double tolerance) {
         auto H_a = H.to_arma();
@@ -44,6 +28,26 @@ namespace fkpm {
         double slack = extra * (eig_max - eig_min);
         return {eig_min-slack, eig_max+slack};
     }
+    template <>
+    EnergyScale energy_scale(SpMatCsr<cx_float> const& H, double extra, double tolerance) {
+        SpMatCsr<cx_double> Hd;
+        Hd = H;
+        return energy_scale(Hd, extra, tolerance);
+    }
+    // TODO: fix Armadillo's eigs_sym
+    template <>
+    EnergyScale energy_scale(SpMatCsr<float> const& H, double extra, double tolerance) {
+        SpMatCsr<cx_double> Hd;
+        Hd = H;
+        return energy_scale(Hd, extra, tolerance);
+    }
+    template <>
+    EnergyScale energy_scale(SpMatCsr<double> const& H, double extra, double tolerance) {
+        SpMatCsr<cx_double> Hd;
+        Hd = H;
+        return energy_scale(Hd, extra, tolerance);
+    }
+    
     
     Vec<double> jackson_kernel(int M) {
         auto ret = Vec<double>(M);
