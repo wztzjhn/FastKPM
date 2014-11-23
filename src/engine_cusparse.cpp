@@ -341,7 +341,7 @@ namespace fkpm {
                 // 2 \alpha_m^\dagger \alpha_m - mu0
                 T_cu result1, result2;
                 TRY(gen_dotc(bl_handle, this->R.size(), (T_cu *)a_d[0].ptr, 1, (T_cu *)a_d[0].ptr, 1, &result1));
-                TRY(gen_dotc(bl_handle, this->R.size(), (T_cu *)a_d[0].ptr, 1, (T_cu *)a_d[0].ptr, 1, &result2));
+                TRY(gen_dotc(bl_handle, this->R.size(), (T_cu *)a_d[1].ptr, 1, (T_cu *)a_d[0].ptr, 1, &result2));
                 mu[2*m]   = 2 * cuda_real(result1) - mu[0];
                 // 2 \alpha_{m+1}^\dagger \alpha_m - mu1
                 mu[2*m+1] = 2 * cuda_real(result2) - mu[1];
