@@ -24,6 +24,8 @@ namespace fkpm {
         std::copy(src_vec.begin(), src_vec.end(), dst_vec.begin());
     };
     
+    constexpr double Pi = 3.141592653589793238463;
+    
     typedef std::complex<float>  cx_float;
     typedef std::complex<double> cx_double;
     
@@ -33,9 +35,6 @@ namespace fkpm {
     template <>             inline double conj(double x) { return x; }
     template <>             inline cx_float conj(cx_float x) { return std::conj(x); }
     template <>             inline cx_double conj(cx_double x) { return std::conj(x); }
-    
-    constexpr double Pi = 3.141592653589793238463;
-    constexpr cx_double I(0, 1);
     
 #ifdef WITH_TBB
     inline void parallel_for(size_t start, size_t end, std::function<void(size_t)> fn) {
