@@ -53,20 +53,28 @@ set(LIBS ${LIBS} ${ARMADILLO_LIBRARIES})
 # Thread Building Blocks
 find_package(TBB)
 if (TBB_FOUND)
-    include_directories(SYSTEM ${TBB_INCLUDE_DIRS})
-    set(LIBS ${LIBS} ${TBB_LIBRARIES})
-    add_definitions(-DWITH_TBB)
+  include_directories(SYSTEM ${TBB_INCLUDE_DIRS})
+  set(LIBS ${LIBS} ${TBB_LIBRARIES})
+  add_definitions(-DWITH_TBB)
 endif()
 
 # CUDA
 find_package(CUDA 6.0)
 if (CUDA_FOUND)
-    message(STATUS "Found CUDA " ${CUDA_VERSION})
-    include_directories(SYSTEM ${CUDA_INCLUDE_DIRS})
-    set(LIBS ${LIBS} ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES} ${CUDA_cusparse_LIBRARY})
-    add_definitions(-DWITH_CUDA)
-    set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-gencode arch=compute_20,code=sm_20)
-    set(CUDA_PROPAGATE_HOST_FLAGS OFF)
+  message(STATUS "Found CUDA " ${CUDA_VERSION})
+  include_directories(SYSTEM ${CUDA_INCLUDE_DIRS})
+  set(LIBS ${LIBS} ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES} ${CUDA_cusparse_LIBRARY})
+  add_definitions(-DWITH_CUDA)
+  if (APPLE)
+    # With recent versions of Xcode, must explicitly use clang
+    set(CUDA_HOST_COMPILER /usr/bin/clang)
+  endif()
+  set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-O2;
+    -gencode=arch=compute_20,code=sm_20;
+    -gencode=arch=compute_30,code=sm_30;
+    -gencode=arch=compute_35,code=sm_35;
+    -gencode=arch=compute_50,code=sm_50)
+  set(CUDA_PROPAGATE_HOST_FLAGS OFF)
 endif()
 
 # Boost
@@ -75,17 +83,17 @@ include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 
 
 if (WITH_MPI)
-    # MPI
-    find_package(MPI REQUIRED)
-    include_directories(${MPI_INCLUDE_PATH})
-    set(LIBS ${LIBS} ${MPI_LIBRARIES})
-    set(CMAKE_CXX_FLAGS        "${CMAKE_CXX_FLAGS} ${MPI_COMPILE_FLAGS}")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${MPI_LINK_FLAGS}")
-    # BOOST MPI
-    set(Boost_USE_MULTITHREADED ON)
-    find_package(Boost REQUIRED COMPONENTS MPI)
-    include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
-    set(LIBS ${LIBS} ${Boost_MPI_LIBRARY})
+  # MPI
+  find_package(MPI REQUIRED)
+  include_directories(${MPI_INCLUDE_PATH})
+  set(LIBS ${LIBS} ${MPI_LIBRARIES})
+  set(CMAKE_CXX_FLAGS        "${CMAKE_CXX_FLAGS} ${MPI_COMPILE_FLAGS}")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${MPI_LINK_FLAGS}")
+  # BOOST MPI
+  set(Boost_USE_MULTITHREADED ON)
+  find_package(Boost REQUIRED COMPONENTS MPI)
+  include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
+  set(LIBS ${LIBS} ${Boost_MPI_LIBRARY})
 endif()
 
 

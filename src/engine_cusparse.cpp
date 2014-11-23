@@ -1,12 +1,3 @@
-//
-//  engine_cusparse.cpp
-//  tibidy
-//
-//  Created by Kipton Barros on 7/25/14.
-//
-//
-
-
 #include "fastkpm.h"
 
 #ifndef WITH_CUDA
@@ -16,7 +7,9 @@ namespace fkpm {
     std::shared_ptr<Engine<T>> mk_engine_cuSPARSE(int device) {
         return nullptr;
     }
+    template std::shared_ptr<Engine<float>> mk_engine_cuSPARSE(int device);
     template std::shared_ptr<Engine<double>> mk_engine_cuSPARSE(int device);
+    template std::shared_ptr<Engine<cx_float>> mk_engine_cuSPARSE(int device);
     template std::shared_ptr<Engine<cx_double>> mk_engine_cuSPARSE(int device);
 }
 
@@ -26,18 +19,16 @@ namespace fkpm {
 #include <cassert>
 #include <cuda_runtime.h>
 #include <cusparse.h>
-#include <cublas.h>
+#include <cublas_v2.h>
 
 
-#define TRY(x) testCudaError((x), __FILE__, __LINE__, #x)
+#define TRY(x) gen_cuda_test_error((x), __FILE__, __LINE__, #x)
 
 namespace fkpm {
-    template <typename T>
-    const char *genericCudaErrorString(T stat);
-    template <>
-    const char *genericCudaErrorString(cudaError_t stat) { return cudaGetErrorString(stat); }
-    template <>
-    const char *genericCudaErrorString(cublasStatus_t stat) {
+    inline const char *gen_cuda_error_string(cudaError_t stat) {
+        return cudaGetErrorString(stat);
+    }
+    inline const char *gen_cuda_error_string(cublasStatus_t stat) {
         switch (stat) {
             case CUBLAS_STATUS_SUCCESS:             return "CUBLAS_STATUS_SUCCESS";
             case CUBLAS_STATUS_NOT_INITIALIZED:     return "CUBLAS_STATUS_NOT_INITIALIZED";
@@ -51,8 +42,7 @@ namespace fkpm {
             default:                                return "<unknown cublas error>";
         }
     }
-    template <>
-    const char *genericCudaErrorString(cusparseStatus_t stat) {
+    inline const char *gen_cuda_error_string(cusparseStatus_t stat) {
         switch (stat) {
             case CUSPARSE_STATUS_SUCCESS:           return "CUSPARSE_STATUS_SUCCESS";
             case CUSPARSE_STATUS_NOT_INITIALIZED:   return "CUSPARSE_STATUS_NOT_INITIALIZED";
@@ -68,53 +58,111 @@ namespace fkpm {
         }
     }
     template <typename T>
-    void testCudaError(T stat, char const* file, int line, char const* code) {
+    void gen_cuda_test_error(T stat, char const* file, int line, char const* code) {
         if (stat) {
-            std::cerr << file << ":" << line <<  ", " << code << ", Error: " << genericCudaErrorString(stat) << std::endl;
+            std::cerr << file << ":" << line <<  ", " << code << ", Error: " << gen_cuda_error_string(stat) << std::endl;
             std::abort();
         }
     }
     
-    inline float           cuda_type(float  x)    { abort(); };
-    inline double          cuda_type(double x)    { abort(); };
-    inline cuFloatComplex  cuda_type(cx_float x)  { abort(); };
-    inline cuDoubleComplex cuda_type(cx_double x) { abort(); };
+    inline float           cuda_cast(float  x)    { return x; };
+    inline double          cuda_cast(double x)    { return x; };
+    inline cuFloatComplex  cuda_cast(cx_float x)  { return make_cuFloatComplex(x.real(), x.imag()); };
+    inline cuDoubleComplex cuda_cast(cx_double x) { return make_cuDoubleComplex(x.real(), x.imag()); };
     
-    template <typename T>
-    inline decltype(cuda_type(T(0))) cast_cuda_val(T);
-    template <> float           cast_cuda_val(float x)     { return x; }
-    template <> double          cast_cuda_val(double x)    { return x; }
-    template <> cuFloatComplex  cast_cuda_val(cx_float x)  { return make_cuFloatComplex(x.real(), x.imag()); }
-    template <> cuDoubleComplex cast_cuda_val(cx_double x) { return make_cuDoubleComplex(x.real(), x.imag()); };
+    inline float  cuda_real(float  x)          { return x; };
+    inline double cuda_real(double x)          { return x; };
+    inline float  cuda_real(cuFloatComplex x)  { return x.x; };
+    inline double cuda_real(cuDoubleComplex x) { return x.x; };
     
-    template <typename T>
-    cusparseStatus_t gen_csrmm(cusparseHandle_t handle, cusparseOperation_t transA, int m, int n, int k, int nnz, const T *alpha,
-                               const cusparseMatDescr_t descrA, const T  *csrValA, const int *csrRowPtrA, const int *csrColIndA,
-                               const T *B, int ldb, const T *beta, T *C, int ldc);
-    template <> // float
+    // -- CSRMM (sparse-dense matrix multiplication) --
+    inline // float
     cusparseStatus_t gen_csrmm(cusparseHandle_t handle, cusparseOperation_t transA, int m, int n, int k, int nnz, const float *alpha,
                                const cusparseMatDescr_t descrA, const float  *csrValA, const int *csrRowPtrA, const int *csrColIndA,
                                const float *B, int ldb, const float *beta, float *C, int ldc) {
         return cusparseScsrmm(handle, transA, m, n, k, nnz, alpha, descrA, csrValA, csrRowPtrA, csrColIndA, B, ldb, beta, C, ldc);
     }
-    template <> // double
+    inline // double
     cusparseStatus_t gen_csrmm(cusparseHandle_t handle, cusparseOperation_t transA, int m, int n, int k, int nnz, const double *alpha,
                                const cusparseMatDescr_t descrA, const double  *csrValA, const int *csrRowPtrA, const int *csrColIndA,
                                const double *B, int ldb, const double *beta, double *C, int ldc) {
         return cusparseDcsrmm(handle, transA, m, n, k, nnz, alpha, descrA, csrValA, csrRowPtrA, csrColIndA, B, ldb, beta, C, ldc);
     }
-    template <> // cx_float
+    inline // cx_float
     cusparseStatus_t gen_csrmm(cusparseHandle_t handle, cusparseOperation_t transA, int m, int n, int k, int nnz, const cuFloatComplex *alpha,
                                const cusparseMatDescr_t descrA, const cuFloatComplex  *csrValA, const int *csrRowPtrA, const int *csrColIndA,
                                const cuFloatComplex *B, int ldb, const cuFloatComplex *beta, cuFloatComplex *C, int ldc) {
         return cusparseCcsrmm(handle, transA, m, n, k, nnz, alpha, descrA, csrValA, csrRowPtrA, csrColIndA, B, ldb, beta, C, ldc);
     }
-    template <> // cx_double
+    inline // cx_double
     cusparseStatus_t gen_csrmm(cusparseHandle_t handle, cusparseOperation_t transA, int m, int n, int k, int nnz, const cuDoubleComplex *alpha,
                                const cusparseMatDescr_t descrA, const cuDoubleComplex  *csrValA, const int *csrRowPtrA, const int *csrColIndA,
                                const cuDoubleComplex *B, int ldb, const cuDoubleComplex *beta, cuDoubleComplex *C, int ldc) {
         return cusparseZcsrmm(handle, transA, m, n, k, nnz, alpha, descrA, csrValA, csrRowPtrA, csrColIndA, B, ldb, beta, C, ldc);
     }
+    
+    // -- DOTC (complex-conjugated dot product) --
+    inline // float
+    cublasStatus_t gen_dotc(cublasHandle_t handle, int n, const float *x, int incx, const float *y, int incy, float *result) {
+        return cublasSdot(handle, n, x, incx, y, incy, result);
+    }
+    inline // double
+    cublasStatus_t gen_dotc(cublasHandle_t handle, int n, const double *x, int incx, const double *y, int incy, double *result) {
+        return cublasDdot(handle, n, x, incx, y, incy, result);
+    }
+    inline // cx_float
+    cublasStatus_t gen_dotc(cublasHandle_t handle, int n, const cuFloatComplex *x, int incx, const cuFloatComplex *y, int incy, cuFloatComplex *result) {
+        return cublasCdotc(handle, n, x, incx, y, incy, result);
+    }
+    inline // cx_double
+    cublasStatus_t gen_dotc(cublasHandle_t handle, int n, const cuDoubleComplex *x, int incx, const cuDoubleComplex *y, int incy, cuDoubleComplex *result) {
+        return cublasZdotc(handle, n, x, incx, y, incy, result);
+    }
+    
+    // -- AXPY (y = alpha*x + y) --
+    inline // float
+    cublasStatus_t gen_axpy(cublasHandle_t handle, int n, const float *alpha, const float *x, int incx, float *y, int incy) {
+        return cublasSaxpy(handle, n, alpha, x, incx, y, incy);
+    }
+    inline // double
+    cublasStatus_t gen_axpy(cublasHandle_t handle, int n, const double *alpha, const double *x, int incx, double *y, int incy) {
+        return cublasDaxpy(handle, n, alpha, x, incx, y, incy);
+    }
+    inline // cx_float
+    cublasStatus_t gen_axpy(cublasHandle_t handle, int n, const cuFloatComplex *alpha, const cuFloatComplex *x, int incx, cuFloatComplex *y, int incy) {
+        return cublasCaxpy(handle, n, alpha, x, incx, y, incy);
+    }
+    inline // cx_double
+    cublasStatus_t gen_axpy(cublasHandle_t handle, int n, const cuDoubleComplex *alpha, const cuDoubleComplex *x, int incx, cuDoubleComplex *y, int incy) {
+        return cublasZaxpy(handle, n, alpha, x, incx, y, incy);
+    }
+    
+    // -- SCAL (x = alpha*x) --
+    inline // float*Vec<float>
+    cublasStatus_t gen_scal(cublasHandle_t handle, int n, const float *alpha, float *x, int incx) {
+        return cublasSscal(handle, n, alpha, x, incx);
+    }
+    inline // double*Vec<double>
+    cublasStatus_t gen_scal(cublasHandle_t handle, int n, const double *alpha, double *x, int incx) {
+        return cublasDscal(handle, n, alpha, x, incx);
+    }
+    inline // cx_float*Vec<cx_float>
+    cublasStatus_t gen_scal(cublasHandle_t handle, int n, const cuComplex *alpha, cuComplex *x, int incx) {
+        return cublasCscal(handle, n, alpha, x, incx);
+    }
+    inline // float*Vec<cx_float>
+    cublasStatus_t gen_scal(cublasHandle_t handle, int n, const float *alpha, cuComplex *x, int incx) {
+        return cublasCsscal(handle, n, alpha, x, incx);
+    }
+    inline // cx_double*Vec<cx_double>
+    cublasStatus_t gen_scal(cublasHandle_t handle, int n, const cuDoubleComplex *alpha, cuDoubleComplex *x, int incx) {
+        return cublasZscal(handle, n, alpha, x, incx);
+    }
+    inline // double*Vec<cx_double>
+    cublasStatus_t gen_scal(cublasHandle_t handle, int n, const double *alpha, cuDoubleComplex *x, int incx) {
+        return cublasZdscal(handle, n, alpha, x, incx);
+    }
+    
     
     template <typename T, typename T_re>
     void outer_product(int n_rows, int n_cols, T_re alpha, T *A, T *B,
@@ -160,7 +208,7 @@ namespace fkpm {
     class Engine_cuSPARSE: public Engine<T> {
     public:
         typedef decltype(std::real(T(0))) T_re;
-        typedef decltype(cuda_type(T(0))) T_cu;
+        typedef decltype(cuda_cast(T(0))) T_cu;
         int device = 0;
         EnergyScale es;
         int Hs_n_rows = 0;
@@ -168,6 +216,7 @@ namespace fkpm {
         T_re Hs_trace = 0;
         Vec<T> Hs_val;
         
+        cublasHandle_t bl_handle;
         cusparseHandle_t cs_handle;
         cusparseMatDescr_t cs_mat_descr;
         
@@ -185,16 +234,16 @@ namespace fkpm {
             this->device = device;
             TRY(cudaSetDevice(device));
             
+            TRY(cublasCreate(&bl_handle));
             TRY(cusparseCreate(&cs_handle));
             TRY(cusparseCreateMatDescr(&cs_mat_descr));
-            // TODO: CUSPARSE_MATRIX_TYPE_HERMITIAN
             TRY(cusparseSetMatType(cs_mat_descr, CUSPARSE_MATRIX_TYPE_GENERAL));
             TRY(cusparseSetMatIndexBase(cs_mat_descr, CUSPARSE_INDEX_BASE_ZERO));
         }
         
         ~Engine_cuSPARSE() {
             TRY(cudaSetDevice(device));
-
+            
             R_d.deallocate();
             xi_d.deallocate();
             for (int i = 0; i < 3; i++) {
@@ -209,6 +258,10 @@ namespace fkpm {
             DRowIndex_d.deallocate();
             DColIndex_d.deallocate();
             DVal_d.deallocate();
+            
+            TRY(cusparseDestroyMatDescr(cs_mat_descr));
+            TRY(cusparseDestroy(cs_handle));
+            TRY(cublasDestroy(bl_handle));
         }
         
         void transfer_R() {
@@ -253,8 +306,8 @@ namespace fkpm {
         void cgemm_H(T alpha, CuVec<T> B_d, T beta, CuVec<T> C_d) {
             int n = this->R.n_rows;
             int s = this->R.n_cols;
-            auto alpha_f = cast_cuda_val(alpha);
-            auto beta_f  = cast_cuda_val(beta);
+            auto alpha_f = cuda_cast(alpha);
+            auto beta_f  = cuda_cast(beta);
             TRY(gen_csrmm(cs_handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
                           n, s, n, Hs_n_nonzero, // (H rows, B cols, H cols, H nnz)
                           &alpha_f,
@@ -286,9 +339,12 @@ namespace fkpm {
                 a_d[2] = temp;
                 
                 // 2 \alpha_m^\dagger \alpha_m - mu0
-                mu[2*m]   = 2 * cublasCdotc(this->R.size(), (cuComplex *)a_d[0].ptr, 1, (cuComplex *)a_d[0].ptr, 1).x - mu[0];
+                T_cu result1, result2;
+                TRY(gen_dotc(bl_handle, this->R.size(), (T_cu *)a_d[0].ptr, 1, (T_cu *)a_d[0].ptr, 1, &result1));
+                TRY(gen_dotc(bl_handle, this->R.size(), (T_cu *)a_d[0].ptr, 1, (T_cu *)a_d[0].ptr, 1, &result2));
+                mu[2*m]   = 2 * cuda_real(result1) - mu[0];
                 // 2 \alpha_{m+1}^\dagger \alpha_m - mu1
-                mu[2*m+1] = 2 * cublasCdotc(this->R.size(), (cuComplex *)a_d[1].ptr, 1, (cuComplex *)a_d[0].ptr, 1).x - mu[1];
+                mu[2*m+1] = 2 * cuda_real(result2) - mu[1];
             }
             
             return mu;
@@ -303,8 +359,10 @@ namespace fkpm {
             
             // xi = c0 a0 + c1 a1
             xi_d.memset(0);
-            cublasCaxpy(this->R.size(), make_cuComplex(c[0], 0), (cuComplex *)a_d[0].ptr, 1, (cuComplex *)xi_d.ptr, 1);
-            cublasCaxpy(this->R.size(), make_cuComplex(c[1], 0), (cuComplex *)a_d[1].ptr, 1, (cuComplex *)xi_d.ptr, 1);
+            T_cu scal0 = cuda_cast(T(c[0]));
+            T_cu scal1 = cuda_cast(T(c[1]));
+            TRY(gen_axpy(bl_handle, this->R.size(), &scal0, (T_cu *)a_d[0].ptr, 1, (T_cu *)xi_d.ptr, 1));
+            TRY(gen_axpy(bl_handle, this->R.size(), &scal1, (T_cu *)a_d[1].ptr, 1, (T_cu *)xi_d.ptr, 1));
             
             int M = c.size();
             for (int m = 2; m < M; m++) {
@@ -312,7 +370,8 @@ namespace fkpm {
                 cgemm_H(2, a_d[1], -1, a_d[2]); // a2 = T_m[H] R = 2 H a1 - a0
                 
                 // xi += cm a2
-                cublasCaxpy(this->R.size(), make_cuComplex(c[m], 0), (cuComplex *)a_d[2].ptr, 1, (cuComplex *)xi_d.ptr, 1);
+                T_cu scal1 = cuda_cast(T(c[m]));
+                TRY(gen_axpy(bl_handle, this->R.size(), &scal1, (T_cu *)a_d[2].ptr, 1, (T_cu *)xi_d.ptr, 1));
                 
                 auto temp = a_d[0];
                 a_d[0] = a_d[1];
@@ -360,7 +419,8 @@ namespace fkpm {
             else {
                 // b0 = 2 c[M-1] a1
                 b_d[0].from_device(a_d[1]);
-                cublasCscal(b_d[0].size, make_cuComplex(2*c[M-1], 0), (cuComplex *)b_d[0].ptr, 1);
+                T_cu scal0 = cuda_cast(T(2*c[M-1]));
+                TRY(gen_scal(bl_handle, b_d[0].size, &scal0, (T_cu *)b_d[0].ptr, 1));
             }
             
             for (int m = M/2-1; m >= 1; m--) {
@@ -389,21 +449,24 @@ namespace fkpm {
                 cgemm_H(2, b_d[1], -1, b_d[0]);
                 
                 // b0 += 4*c[2*m]*a1
-                cublasCaxpy(b_d[0].size,
-                            make_cuComplex(4*c[2*m], 0),
-                            (cuComplex *)a_d[1].ptr, 1,
-                            (cuComplex *)b_d[0].ptr, 1);
+                T_cu scal0 = cuda_cast(T(4*c[2*m]));
+                TRY(gen_axpy(bl_handle, b_d[0].size,
+                                &scal0,
+                                (T_cu *)a_d[1].ptr, 1,
+                                (T_cu *)b_d[0].ptr, 1));
                 // b0 += 2*c[2*m+1]*a2
-                cublasCaxpy(b_d[0].size,
-                            make_cuComplex(2*c[2*m+1], 0),
-                            (cuComplex *)a_d[2].ptr, 1,
-                            (cuComplex *)b_d[0].ptr, 1);
+                T_cu scal1 = cuda_cast(T(2*c[2*m+1]));
+                TRY(gen_axpy(bl_handle, b_d[0].size,
+                                &scal1,
+                                (T_cu *)a_d[2].ptr, 1,
+                                (T_cu *)b_d[0].ptr, 1));
                 // b0 += 2*c[2*m-1]*a0
                 if (m > 1) {
-                    cublasCaxpy(b_d[0].size,
-                                make_cuComplex(2*c[2*m-1], 0),
-                                (cuComplex *)a_d[0].ptr, 1,
-                                (cuComplex *)b_d[0].ptr, 1);
+                    T_cu scal2 = cuda_cast(T(2*c[2*m-1]));
+                    TRY(gen_axpy(bl_handle, b_d[0].size,
+                                    &scal2,
+                                    (T_cu *)a_d[0].ptr, 1,
+                                    (T_cu *)b_d[0].ptr, 1));
                 }
             }
             
