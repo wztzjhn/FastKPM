@@ -419,7 +419,7 @@ namespace fkpm {
             else {
                 // b0 = 2 c[M-1] a1
                 b_d[0].from_device(a_d[1]);
-                T_cu scal0 = cuda_cast(T(2*c[M-1]));
+                T_re scal0 = 2*c[M-1];
                 TRY(gen_scal(bl_handle, b_d[0].size, &scal0, (T_cu *)b_d[0].ptr, 1));
             }
             
@@ -487,11 +487,12 @@ namespace fkpm {
         }
     };
     
+    
+    static Vec<bool> printed_mk_engine_msg(16, false);
     template <typename T>
     std::shared_ptr<Engine<T>> mk_engine_cuSPARSE(int device) {
         std::stringstream msg;
-        static Vec<bool> printed_msg(16, false);
-        assert(device >= 0 && device < printed_msg.size());
+        assert(device >= 0 && device < printed_mk_engine_msg.size());
         std::shared_ptr<Engine<T>> ret = nullptr;
         int count;
         int err = cudaGetDeviceCount(&count);
@@ -520,36 +521,17 @@ namespace fkpm {
                 msg << "Unknown CUDA error " << err << "!\n";
                 break;
         }
-        if (!printed_msg[device]) {
+        if (!printed_mk_engine_msg[device]) {
             std::cout << msg.str();
-            printed_msg[device] = true;
+            printed_mk_engine_msg[device] = true;
         }
         return ret;
     }
     
-    template <>
-    std::shared_ptr<Engine<double>> mk_engine_cuSPARSE(int device) {
-        std::cerr << "cuSPARSE engine not yet implemented for type `double`!\n";
-        return nullptr; // not yet implemented
-    }
-    template <>
-    std::shared_ptr<Engine<float>> mk_engine_cuSPARSE(int device) {
-        std::cerr << "cuSPARSE engine not yet implemented for type `double`!\n";
-        return nullptr; // not yet implemented
-    }
-
-// #define YES
-#ifdef WITH_DOUBLE
-    template std::shared_ptr<Engine<cx_double>> mk_engine_cuSPARSE(int device);
-#else
-    template <>
-    std::shared_ptr<Engine<cx_double>> mk_engine_cuSPARSE(int device) {
-        std::cerr << "cuSPARSE engine not yet implemented for type `double`!\n";
-        return nullptr; // not yet implemented
-    }
-#endif
-    
+    template std::shared_ptr<Engine<float>> mk_engine_cuSPARSE(int device);
+    template std::shared_ptr<Engine<double>> mk_engine_cuSPARSE(int device);
     template std::shared_ptr<Engine<cx_float>> mk_engine_cuSPARSE(int device);
+    template std::shared_ptr<Engine<cx_double>> mk_engine_cuSPARSE(int device);
 }
 
 #endif // WITH_CUDA
