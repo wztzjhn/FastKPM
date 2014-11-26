@@ -59,7 +59,7 @@ if (TBB_FOUND)
 endif()
 
 # CUDA
-find_package(CUDA 6.0)
+find_package(CUDA 6.5)
 if (CUDA_FOUND)
   message(STATUS "Found CUDA " ${CUDA_VERSION})
   include_directories(SYSTEM ${CUDA_INCLUDE_DIRS})

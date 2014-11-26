@@ -30,11 +30,10 @@ namespace fkpm {
     typedef std::complex<double> cx_double;
     
     // complex conjugation that preserves real values
-    template <typename T>   T conj(T x);
-    template <>             inline float conj(float x) { return x; }
-    template <>             inline double conj(double x) { return x; }
-    template <>             inline cx_float conj(cx_float x) { return std::conj(x); }
-    template <>             inline cx_double conj(cx_double x) { return std::conj(x); }
+    inline float     conj(float x)     { return x; }
+    inline double    conj(double x)    { return x; }
+    inline cx_float  conj(cx_float x)  { return std::conj(x); }
+    inline cx_double conj(cx_double x) { return std::conj(x); }
     
 #ifdef WITH_TBB
     inline void parallel_for(size_t start, size_t end, std::function<void(size_t)> fn) {
@@ -49,42 +48,52 @@ namespace fkpm {
     
     // -- spmat.cpp ------------------------------------------------------------------------
     
-    // Sparse matrix in Coordinate list format
+    // Blocks of matrix elements in unsorted order
     template <typename T>
     class SpMatElems {
     public:
+        int n_rows, n_cols, b_len;
         Vec<int> row_idx, col_idx;
         Vec<T> val;
-        int size() const;
+        SpMatElems(int n_rows, int n_cols, int b_len);
+        int n_blocks() const;
         void clear();
-        void add(int i, int j, T v);
+        void add(int i, int j, T const* v);
     };
-    // Sparse matrix in Compressed Sparse Row format
+    // Sparse matrix in block compressed sparse row (BSR) format. Each dense block is stored
+    // in column-major order (the BLAS and LAPACK standard).
     template <typename T>
-    class SpMatCsr {
+    class SpMatBsr {
     private:
-        Vec<Vec<int>> sorted_ptr;
+        Vec<Vec<int>> sorted_ptr_bin;
+        Vec<int> sorted_ptr;
     public:
-        int n_rows = 0, n_cols = 0;
+        int n_rows = 0, n_cols = 0, b_len = 0;
         Vec<int> row_idx, col_idx, row_ptr;
         Vec<T> val;
-        SpMatCsr();
-        SpMatCsr(int n_rows, int n_cols, SpMatElems<T> const& that);
-        int size() const;
+        SpMatBsr();
+        SpMatBsr(SpMatElems<T> const& elems);
+        void build(SpMatElems<T> const& elems);
+        int n_blocks() const;
         void clear();
         int find_index(int i, int j) const;
-        T& operator()(int i, int j);
-        T const& operator()(int i, int j) const;
-        void build(int n_rows, int n_cols, SpMatElems<T> const& elems);
+        T* operator()(int i, int j);
+        T const* operator()(int i, int j) const;
         void zeros();
         void symmetrize();
+        void scale(T alpha);
         arma::SpMat<T> to_arma() const;
         arma::Mat<T> to_arma_dense() const;
         
         template<typename S>
-        SpMatCsr<T>& operator=(SpMatCsr<S> const& that) {
+        SpMatBsr(SpMatBsr<S> const& that): SpMatBsr() {
+            *this = that;
+        }
+        template<typename S>
+        SpMatBsr<T>& operator=(SpMatBsr<S> const& that) {
             n_rows = that.n_rows;
             n_cols = that.n_cols;
+            b_len = that.b_len;
             copy_vec(that.row_idx, row_idx);
             copy_vec(that.col_idx, col_idx);
             copy_vec(that.row_ptr, row_ptr);
@@ -103,12 +112,14 @@ namespace fkpm {
         double mag() const { return (hi - lo) / 2.0; }
         double scale(double x) const { return (x - avg()) / mag(); }
         double unscale(double x) const { return x * mag() + avg(); }
-        friend std::ostream& operator<< (std::ostream& stream, EnergyScale const& es);
+        friend std::ostream& operator<< (std::ostream& stream, EnergyScale const& es) {
+            return stream << "< lo = " << es.lo << " hi = " << es.hi << " >\n";
+        }
     };
     
     // Use Lanczos to bound eigenvalues of H, and determine appropriate rescaling
     template <typename T>
-    EnergyScale energy_scale(SpMatCsr<T> const& H, double extend, double tolerance);
+    EnergyScale energy_scale(SpMatBsr<T> const& H, double extend, double tolerance);
     
     // Used to damp Gibbs oscillations in KPM estimates
     Vec<double> jackson_kernel(int M);
@@ -178,20 +189,20 @@ namespace fkpm {
         virtual void transfer_R() {}
         
         // Set Hamiltonian and energy scale
-        virtual void set_H(SpMatCsr<T> const& H, EnergyScale const& es) = 0;
+        virtual void set_H(SpMatBsr<T> const& H, EnergyScale const& es) = 0;
         
         // Chebyshev moments: mu_m = tr T_m(Hs) ~ tr R^\dagger T_m(Hs) R
         virtual Vec<double> moments(int M) = 0;
         
         // Approximates D ~ (xi R^\dagger + R xi^\dagger)/2 where xi = D R
         // and D ~ (\sum_m c_m T_m(Hs))R
-        virtual void stoch_matrix(Vec<double> const& c, SpMatCsr<T>& D) = 0;
+        virtual void stoch_matrix(Vec<double> const& c, SpMatBsr<T>& D) = 0;
         
         // Approximates D ~ (d/dH^T) tr g where tr g ~ tr R^\dagger g R,
         // g~\sum_m c_m T_m(Hs) and coefficients c_m chosen such that
         // dg(x)/dx = D(x).
         // REQUIREMENT: moments() must have been called previously.
-        virtual void autodiff_matrix(Vec<double> const& c, SpMatCsr<T>& D) = 0;
+        virtual void autodiff_matrix(Vec<double> const& c, SpMatBsr<T>& D) = 0;
     };
     
     // CPU engine
