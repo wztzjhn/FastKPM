@@ -195,9 +195,9 @@ namespace fkpm {
     
     
     template <typename T, typename T_re>
-    void outer_product(int n_rows, int n_cols, T_re alpha, T *A, T *B,
-                       int D_nnz, int *D_row_idx, int *D_col_idx, T *D_val);
-    
+    void outer_product(int b_rows, int b_len, int n_cols, T_re alpha, T *A, T *B,
+                       int n_blocks, int *D_row_idx, int *D_col_idx, T *D_val);
+
     // Caution: cudaSetDevice() must be called before any operations.
     template <typename T>
     class CuVec {
@@ -433,9 +433,9 @@ namespace fkpm {
             DColIndex_d.from_host(D.col_idx.size(), D.col_idx.data());
             DVal_d.resize(D.val.size());
             DVal_d.memset(0);
-            outer_product(this->R.n_rows, this->R.n_cols, T_re(0.5), (T_cu *)R_d.ptr, (T_cu *)xi_d.ptr,
+            outer_product(n_rows, b_len, this->R.n_cols, T_re(0.5), (T_cu *)R_d.ptr, (T_cu *)xi_d.ptr,
                           D.n_blocks(), DRowIndex_d.ptr, DColIndex_d.ptr, (T_cu *)DVal_d.ptr);
-            outer_product(this->R.n_rows, this->R.n_cols, T_re(0.5), (T_cu *)xi_d.ptr, (T_cu *)R_d.ptr,
+            outer_product(n_rows, b_len, this->R.n_cols, T_re(0.5), (T_cu *)xi_d.ptr, (T_cu *)R_d.ptr,
                           D.n_blocks(), DRowIndex_d.ptr, DColIndex_d.ptr, (T_cu *)DVal_d.ptr);
             DVal_d.to_host(D.val.data());
             
@@ -448,9 +448,6 @@ namespace fkpm {
             assert(b_len*n_rows == this->R.n_rows && b_len*n_rows >= this->R.n_cols);
             
             int M = c.size();
-            int n = this->R.n_rows;
-            int s = this->R.n_cols;
-            
             double diag = c[1];
             for (int m = 1; m < M/2; m++) {
                 diag -= c[2*m+1];
@@ -485,7 +482,7 @@ namespace fkpm {
                 // a0 = \alpha_m, b0 = \beta_{m+1}
                 
                 // D += 2 \alpha_m \beta_{m+1}^\dagger
-                outer_product(n, s, T_re(2), (T_cu *)a_d[0].ptr, (T_cu *)b_d[0].ptr,
+                outer_product(n_rows, b_len, this->R.n_cols, T_re(2), (T_cu *)a_d[0].ptr, (T_cu *)b_d[0].ptr,
                               D.n_blocks(), DRowIndex_d.ptr, DColIndex_d.ptr, (T_cu *)DVal_d.ptr);
                 TRY(cudaPeekAtLastError());
                 TRY(cudaDeviceSynchronize());
@@ -529,7 +526,7 @@ namespace fkpm {
             }
             
             // D += \alpha_0 \beta_1^\dagger
-            outer_product(n, s, T_re(1), (T_cu *)a_d[0].ptr, (T_cu *)b_d[0].ptr,
+            outer_product(n_rows, b_len, this->R.n_cols, T_re(1), (T_cu *)a_d[0].ptr, (T_cu *)b_d[0].ptr,
                           D.n_blocks(), DRowIndex_d.ptr, DColIndex_d.ptr, (T_cu *)DVal_d.ptr);
             TRY(cudaPeekAtLastError());
             TRY(cudaDeviceSynchronize());
