@@ -46,7 +46,7 @@ namespace fkpm {
                 T b = B[b_len*b_rows*l + b_len*j + bj];
                 acc = add(acc, mul(a, conj(b)));
             }
-            D_val[idx] = mul(alpha, acc);
+            D_val[idx] = add(D_val[idx], mul(alpha, acc));
         }
     }
     
