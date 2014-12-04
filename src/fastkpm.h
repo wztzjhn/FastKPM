@@ -106,7 +106,8 @@ namespace fkpm {
     // -- fastkpm.cpp ------------------------------------------------------------------------
     
     // Scale eigenvalues within range (-1, +1)
-    struct EnergyScale {
+    class EnergyScale {
+    public:
         double lo, hi;
         double avg() const { return (hi + lo) / 2.0; }
         double mag() const { return (hi - lo) / 2.0; }

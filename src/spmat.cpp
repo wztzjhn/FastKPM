@@ -62,7 +62,6 @@ namespace fkpm {
         
         // sort if necessary
         if (!sorted) {
-            std::cout << "sorting!\n";
             sorted_ptr_bin.resize(n_rows);
             for (int i = 0; i < n_rows; i++) {
                 sorted_ptr_bin[i].resize(0);
@@ -83,7 +82,6 @@ namespace fkpm {
             }
         }
         else {
-            std::cout << "no sort!\n";
             sorted_ptr.resize(elems.n_blocks());
             for (int p = 0; p < elems.n_blocks(); p++) {
                 sorted_ptr[p] = p;
@@ -163,7 +161,7 @@ namespace fkpm {
     
     template <typename T>
     void SpMatBsr<T>::zeros() {
-        std::fill(val.begin(), val.end(), 0);
+        std::memset(val.data(), 0, val.size()*sizeof(T));
     }
     
     template <typename T>
@@ -189,7 +187,8 @@ namespace fkpm {
     
     template <typename T>
     void SpMatBsr<T>::scale(T alpha) {
-        for (int k = 0; k < val.size(); k++) {
+        int sz = val.size();
+        for (int k = 0; k < sz; k++) {
             val[k] *= alpha;
         }
     }

@@ -74,6 +74,28 @@ namespace fkpm {
     inline double cuda_real(double x)          { return x; };
     inline float  cuda_real(cuFloatComplex x)  { return x.x; };
     inline double cuda_real(cuDoubleComplex x) { return x.x; };
+
+    // -- GEAM (matrix-matrix addition/transposition) --
+    inline // float
+    cublasStatus_t gen_geam(cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb, int m, int n, const float *alpha,
+                            const float *A, int lda, const float *beta, const float *B, int ldb, float *C, int ldc) {
+        return cublasSgeam(handle, transa, transb, m, n, alpha, A, lda, beta, B, ldb, C, ldc);
+    }
+    inline // double
+    cublasStatus_t gen_geam(cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb, int m, int n, const double *alpha,
+                            const double *A, int lda, const double *beta, const double *B, int ldb, double *C, int ldc) {
+        return cublasDgeam(handle, transa, transb, m, n, alpha, A, lda, beta, B, ldb, C, ldc);
+    }
+    inline // cx_float
+    cublasStatus_t gen_geam(cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb, int m, int n, const cuFloatComplex *alpha,
+                            const cuFloatComplex *A, int lda, const cuFloatComplex *beta, const cuFloatComplex *B, int ldb, cuFloatComplex *C, int ldc) {
+        return cublasCgeam(handle, transa, transb, m, n, alpha, A, lda, beta, B, ldb, C, ldc);
+    }
+    inline // cx_double
+    cublasStatus_t gen_geam(cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb, int m, int n, const cuDoubleComplex *alpha, 
+                            const cuDoubleComplex *A, int lda, const cuDoubleComplex *beta, const cuDoubleComplex *B, int ldb, cuDoubleComplex *C, int ldc) {
+        return cublasZgeam(handle, transa, transb, m, n, alpha, A, lda, beta, B, ldb, C, ldc);
+    }
     
     // -- CSRMM (sparse-dense matrix multiplication) --
     inline // float
@@ -193,18 +215,16 @@ namespace fkpm {
         return cublasZdscal(handle, n, alpha, x, incx);
     }
     
-    
     template <typename T, typename T_re>
-    void outer_product(int b_rows, int b_len, int n_cols, T_re alpha, T *A, T *B,
-                       int n_blocks, int *D_row_idx, int *D_col_idx, T *D_val);
-
-    // Caution: cudaSetDevice() must be called before any operations.
+    void outer_product(int b_rows, int b_len, int n_cols, T_re alpha, const T *A, const T *B,
+                       int n_blocks, const int *D_row_idx, const int *D_col_idx, T *D_val);
+    
     template <typename T>
     class CuVec {
     public:
         int size = 0;
         int capacity = 0;
-        T *ptr = 0; // TODO: T* and remove casts
+        T* ptr = 0;
         void resize(int size) {
             this->size = size;
             if (size > capacity) {
@@ -239,8 +259,11 @@ namespace fkpm {
     public:
         typedef decltype(std::real(T(0))) T_re;
         typedef decltype(cuda_cast(T(0))) T_cu;
+        const T_cu zero_cu = cuda_cast(T(0));
+        const T_cu one_cu  = cuda_cast(T(1));
+        
         int device = 0;
-        EnergyScale es;
+        EnergyScale es{0, 0};
         int n_rows = 0;
         int b_len = 0;
         int n_blocks = 0;
@@ -251,7 +274,7 @@ namespace fkpm {
         cusparseHandle_t cs_handle;
         cusparseMatDescr_t cs_mat_descr;
         
-        CuVec<T> R_d, xi_d;
+        CuVec<T> R_d, xi_d, t_d;
         CuVec<T> a_d[3];
         CuVec<T> b_d[3];
         
@@ -277,6 +300,7 @@ namespace fkpm {
             
             R_d.deallocate();
             xi_d.deallocate();
+            t_d.deallocate();
             for (int i = 0; i < 3; i++) {
                 a_d[i].deallocate();
                 b_d[i].deallocate();
@@ -299,12 +323,22 @@ namespace fkpm {
             TRY(cudaSetDevice(device));
             
             int sz = this->R.size();
-            R_d.from_host(sz, this->R.memptr());
+            
             xi_d.resize(sz);
+            R_d.resize(sz);
+            t_d.resize(sz);
             for (int i = 0; i < 3; i++) {
                 a_d[i].resize(sz);
                 b_d[i].resize(sz);
             }
+
+            // t_d = R
+            t_d.from_host(sz, this->R.memptr());
+            // R_d = transpose(t_d)
+            int n = this->R.n_rows;
+            int s = this->R.n_cols;
+            TRY(gen_geam(bl_handle, CUBLAS_OP_T, CUBLAS_OP_T, s, n, &one_cu, (T_cu *)t_d.ptr, n,
+                         &zero_cu, (T_cu *)t_d.ptr, n, (T_cu *)R_d.ptr, s));
         }
         
         void set_H(SpMatBsr<T> const& H, EnergyScale const& es) {
@@ -343,26 +377,25 @@ namespace fkpm {
             HVal_d.from_host(Hs_val.size(), Hs_val.data());
         }
         
-        // C = alpha H B + beta C
+        // C = (alpha H B^T)^T + beta C
         void cgemm_H(T alpha, CuVec<T> B_d, T beta, CuVec<T> C_d) {
             int n = this->R.n_rows;
             int s = this->R.n_cols;
-            auto alpha_f = cuda_cast(alpha);
-            auto beta_f  = cuda_cast(beta);
-//            TRY(gen_csrmm(cs_handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
-//                          n, s, n, Hs_n_nonzero, // (H rows, B cols, H cols, H nnz)
-//                          &alpha_f,
-//                          cs_mat_descr, (T_cu *)HVal_d.ptr, HRowPtr_d.ptr, HColIndex_d.ptr, // H matrix
-//                          (T_cu *)B_d.ptr, n, // (B, B rows)
-//                          &beta_f,
-//                          (T_cu *)C_d.ptr, n)); // (C, C rows)
-            TRY(gen_bsrmm(cs_handle, CUSPARSE_DIRECTION_COLUMN, CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_NON_TRANSPOSE,
-                          n_rows, s, n_rows, n_blocks, // # block rows, # dense cols, # block cols, # nonzero blocks
-                          &alpha_f,
+            
+            // t = H B^T
+            TRY(gen_bsrmm(cs_handle, CUSPARSE_DIRECTION_COLUMN, CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_TRANSPOSE,
+                          n_rows, s, n_rows, n_blocks, // H # block rows, # element cols, # block cols, # nonzero blocks
+                          &one_cu,
                           cs_mat_descr, (T_cu *)HVal_d.ptr, HRowPtr_d.ptr, HColIndex_d.ptr, b_len, // H matrix
-                          (T_cu *)B_d.ptr, n, // B, # B rows
-                          &beta_f,
-                          (T_cu *)C_d.ptr, n));
+                          (T_cu *)B_d.ptr, s,
+                          &zero_cu,
+                          (T_cu *)t_d.ptr, n));
+            
+            // C = alpha t^T + beta C
+            T_cu alpha_cu = cuda_cast(alpha);
+            T_cu beta_cu  = cuda_cast(beta);
+            TRY(gen_geam(bl_handle, CUBLAS_OP_T, CUBLAS_OP_N, s, n, &alpha_cu, (T_cu *)t_d.ptr, n,
+                         &beta_cu, (T_cu *)C_d.ptr, s, (T_cu *)C_d.ptr, s));
         }
         
         Vec<double> moments(int M) {
@@ -390,7 +423,7 @@ namespace fkpm {
                 T_cu result1, result2;
                 TRY(gen_dotc(bl_handle, this->R.size(), (T_cu *)a_d[0].ptr, 1, (T_cu *)a_d[0].ptr, 1, &result1));
                 TRY(gen_dotc(bl_handle, this->R.size(), (T_cu *)a_d[1].ptr, 1, (T_cu *)a_d[0].ptr, 1, &result2));
-                mu[2*m]   = 2 * cuda_real(result1) - mu[0];
+                mu[2*m+0] = 2 * cuda_real(result1) - mu[0];
                 // 2 \alpha_{m+1}^\dagger \alpha_m - mu1
                 mu[2*m+1] = 2 * cuda_real(result2) - mu[1];
             }
@@ -444,6 +477,7 @@ namespace fkpm {
         }
         
         void autodiff_matrix(Vec<double> const& c, SpMatBsr<T>& D) {
+            TRY(cudaSetDevice(device));
             assert(D.n_rows == n_rows && D.n_cols == n_rows && D.b_len == b_len);
             assert(b_len*n_rows == this->R.n_rows && b_len*n_rows >= this->R.n_cols);
             
@@ -505,23 +539,14 @@ namespace fkpm {
                 
                 // b0 += 4*c[2*m]*a1
                 T_cu scal0 = cuda_cast(T(4*c[2*m]));
-                TRY(gen_axpy(bl_handle, b_d[0].size,
-                                &scal0,
-                                (T_cu *)a_d[1].ptr, 1,
-                                (T_cu *)b_d[0].ptr, 1));
+                TRY(gen_axpy(bl_handle, b_d[0].size, &scal0, (T_cu *)a_d[1].ptr, 1, (T_cu *)b_d[0].ptr, 1));
                 // b0 += 2*c[2*m+1]*a2
                 T_cu scal1 = cuda_cast(T(2*c[2*m+1]));
-                TRY(gen_axpy(bl_handle, b_d[0].size,
-                                &scal1,
-                                (T_cu *)a_d[2].ptr, 1,
-                                (T_cu *)b_d[0].ptr, 1));
+                TRY(gen_axpy(bl_handle, b_d[0].size, &scal1, (T_cu *)a_d[2].ptr, 1, (T_cu *)b_d[0].ptr, 1));
                 // b0 += 2*c[2*m-1]*a0
                 if (m > 1) {
                     T_cu scal2 = cuda_cast(T(2*c[2*m-1]));
-                    TRY(gen_axpy(bl_handle, b_d[0].size,
-                                    &scal2,
-                                    (T_cu *)a_d[0].ptr, 1,
-                                    (T_cu *)b_d[0].ptr, 1));
+                    TRY(gen_axpy(bl_handle, b_d[0].size, &scal2, (T_cu *)a_d[0].ptr, 1, (T_cu *)b_d[0].ptr, 1));
                 }
             }
             

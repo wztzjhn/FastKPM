@@ -6,7 +6,7 @@
 namespace fkpm {
     template <typename T>
     class Engine_CPU: public Engine<T> {
-        EnergyScale es;        // Scaling bounds
+        EnergyScale es{0, 0};  // Scaling bounds
         arma::SpMat<T> Hs;     // Scaled Hamiltonian
         arma::Mat<T> a0;
         arma::Mat<T> a1;
