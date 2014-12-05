@@ -10,16 +10,16 @@ namespace fkpm {
     // Random number from {+1, -1}
     template <>
     double random_phase(RNG& rng) {
-        std::uniform_int_distribution<uint32_t> dist2(0,1);
-        return double(dist2(rng));
+        std::uniform_int_distribution<int> dist2(0,1);
+        return 2*dist2(rng)-1;
     }
     template <>
     float random_phase(RNG& rng) { return float(random_phase<double>(rng)); }
     
-    // Random number from {+1, i, -1, -i}
+    // Random number from {+1, +i, -1, -i}
     template <>
     cx_double random_phase(RNG& rng) {
-        std::uniform_int_distribution<uint32_t> dist4(0,3);
+        std::uniform_int_distribution<int> dist4(0,3);
         switch (dist4(rng)) {
             case 0: return {+1,  0};
             case 1: return { 0, +1};
@@ -29,7 +29,7 @@ namespace fkpm {
         assert(false);
     }
     template <>
-    cx_float random_phase(RNG& rng) { return cx_float(random_phase<double>(rng)); }
+    cx_float random_phase(RNG& rng) { return cx_float(random_phase<cx_double>(rng)); }
     
     template <typename T>
     void Engine<T>::set_R_uncorrelated(int n, int s, RNG& rng) {
