@@ -579,7 +579,7 @@ namespace fkpm {
                 if (device < count) {
                     cudaDeviceProp prop;
                     cudaGetDeviceProperties(&prop, device);
-                    msg << "Using device " << device << "\n";
+                    msg << "Using device #" << device << " (" << count << " devices available)\n";
                     msg << "  Device name:           " << prop.name << "\n";
                     msg << "  Total global memory:   " << prop.totalGlobalMem/(1024.*1024.*1024.) << " (GB)\n";
                     msg << "  Peak memory bandwidth: " << 2.0*prop.memoryClockRate*(prop.memoryBusWidth/8)/1.0e6 << " (GB/s)\n\n";
