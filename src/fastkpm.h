@@ -91,6 +91,7 @@ namespace fkpm {
         }
         template<typename S>
         SpMatBsr<T>& operator=(SpMatBsr<S> const& that) {
+			if (this == & that) return *this;
             n_rows = that.n_rows;
             n_cols = that.n_cols;
             b_len = that.b_len;
