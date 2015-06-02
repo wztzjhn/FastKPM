@@ -18,9 +18,10 @@ namespace fkpm {
     EnergyScale energy_scale(SpMatBsr<T> const& H, double extra, double tolerance) {
         arma::sp_cx_mat H_a = SpMatBsr<cx_double>(H).to_arma();
         arma::cx_vec eigval;
-        arma::eigs_gen(eigval, H_a, 1, "sr", tolerance);
+        int num=(H_a.n_rows>500)?10:1;    //use 500:10 for now, fine tune the numbers in the future
+        arma::eigs_gen(eigval, H_a, num, "sr", tolerance);
         double eig_min = eigval(0).real();
-        arma::eigs_gen(eigval, H_a, 1, "lr", tolerance);
+        arma::eigs_gen(eigval, H_a, num, "lr", tolerance);
         double eig_max = eigval(0).real();
         double slack = extra * (eig_max - eig_min);
         return {eig_min-slack, eig_max+slack};

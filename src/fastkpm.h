@@ -91,14 +91,15 @@ namespace fkpm {
         }
         template<typename S>
         SpMatBsr<T>& operator=(SpMatBsr<S> const& that) {
-			if (this == & that) return *this;
-            n_rows = that.n_rows;
-            n_cols = that.n_cols;
-            b_len = that.b_len;
-            copy_vec(that.row_idx, row_idx);
-            copy_vec(that.col_idx, col_idx);
-            copy_vec(that.row_ptr, row_ptr);
-            copy_vec(that.val, val);
+            if ((void *) this != (void *) &that) {
+                n_rows = that.n_rows;
+                n_cols = that.n_cols;
+                b_len = that.b_len;
+                copy_vec(that.row_idx, row_idx);
+                copy_vec(that.col_idx, col_idx);
+                copy_vec(that.row_ptr, row_ptr);
+                copy_vec(that.val, val);
+            }
             return *this;
         }
     };
