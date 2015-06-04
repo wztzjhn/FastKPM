@@ -54,14 +54,15 @@ namespace fkpm {
     }
     
     Vec<double> expansion_coefficients(int M, int Mq, std::function<double(double)> f, EnergyScale es) {
-        // TODO: replace with DCT-II, f -> fp
+        // TODO: replace with DCT-II, f -> fp (caution, double check FFTW docs)
         auto fp = Vec<double>(Mq, 0.0);
         auto T = Vec<double>(M);
         for (int i = 0; i < Mq; i++) {
             double x_i = cos(Pi * (i+0.5) / Mq);
+            double f_i = f(es.unscale(x_i));
             chebyshev_fill_array(x_i, T);
             for (int m = 0; m < M; m++) {
-                fp[m] += f(es.unscale(x_i)) * T[m];
+                fp[m] += f_i * T[m];
             }
         }
         auto kernel = jackson_kernel(M);
@@ -82,7 +83,7 @@ namespace fkpm {
         for (int m = 0; m < M; m++)
             mup[m] = moments[m] * kernel[m];
         
-        // TODO: replace with DCT-III, mup -> gamma
+        // TODO: replace with DCT-III, mup -> gamma (caution, double check FFTW docs)
         for (int i = 0; i < Mq; i++) {
             double x_i = cos(Pi * (i+0.5) / Mq);
             chebyshev_fill_array(x_i, T); // T_m(x_i) = cos(m pi (i+1/2) / Mq)
