@@ -202,8 +202,10 @@ namespace fkpm {
         virtual void stoch_matrix(Vec<double> const& c, SpMatBsr<T>& D) = 0;
         
         // Approximates D ~ (d/dH^T) tr g where tr g ~ tr R^\dagger g R,
-        // g~\sum_m c_m T_m(Hs) and coefficients c_m chosen such that
+        // g ~ \sum_m c_m T_m(Hs) and coefficients c_m chosen such that
         // dg(x)/dx = D(x).
+        // Typically D is dense, but only a small fraction of its elements are
+        // desired. The sparsity structure of D is specified as an input.
         // REQUIREMENT: moments() must have been called previously.
         virtual void autodiff_matrix(Vec<double> const& c, SpMatBsr<T>& D) = 0;
     };

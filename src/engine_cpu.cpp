@@ -89,11 +89,11 @@ namespace fkpm {
             a1.clear();
         }
         
-        void autodiff_matrix(Vec<double> const& c, SpMatBsr<T>& D) { // \frac{dG}{dH^T}
+        void autodiff_matrix(Vec<double> const& c, SpMatBsr<T>& D) {
             int M = c.size();
             int n = this->R.n_rows;
             int s = this->R.n_cols;
-            assert(D.b_len*D.n_rows == Hs.n_rows && D.b_len*D.n_cols == Hs.n_rows); //sparse structure same as Hs
+            assert(D.b_len*D.n_rows == Hs.n_rows && D.b_len*D.n_cols == Hs.n_rows);
             assert(Hs.n_rows == n);
             
             double diag = c[1];
@@ -109,12 +109,15 @@ namespace fkpm {
                     }
                 }
             }
-            // \beta_m^* \equiv \frac{\partial G}{\partial \alpha_m}
+            
+            // Note that the \beta_m matrices are the "adjoint nodes" to alpha_m. Specifically,
+            // \beta^*_m = (d / d\alpha_m) tr g,
+            // This is a total derivative, including all implicit dependencies in the call graph.
             arma::Mat<T> b2(n, s);
             arma::Mat<T> b1(n, s, arma::fill::zeros);   // \beta_{M/2+1}
             arma::Mat<T> b0(n, s, arma::fill::zeros);   // \beta_{M/2}
             if (M > 2)
-                b0 = 2 * c[M-1] * a0;   // a0=\alpha_{M/2-1} after moments calculation
+                b0 = 2 * c[M-1] * a0;   // a0 = \alpha_{M/2-1} after moments() calculation
             
             for (int m = M/2-1; m >= 1; m--) {
                 // a0 = \alpha_m, b0 = \beta_{m+1}
