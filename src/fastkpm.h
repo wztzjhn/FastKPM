@@ -5,6 +5,7 @@
 #include <vector>
 #include <chrono>
 #include <memory>
+#include <string>
 #include <armadillo>
 
 #ifdef WITH_TBB
@@ -127,17 +128,34 @@ namespace fkpm {
     // Used to damp Gibbs oscillations in KPM estimates
     Vec<double> jackson_kernel(int M);
     
+    // Used to damp Gibbs oscillations in KPM estimates
+    // Kernel which can accept "Jackson"(default) or "Lorentz", where lambda can be set for Lorentz Kernel
+    Vec<double> set_kernel(int M, std::string kernel_name = "Jackson", double lambda = 0.01);
+    
     // Chebyshev polynomials T_m(x) evaluated at x
     void chebyshev_fill_array(double x, Vec<double>& ret);
     
     // Coefficients c_m that satisfy f(x) = \sum_m T_m(x) c_m
     Vec<double> expansion_coefficients(int M, int Mq, std::function<double(double)> f, EnergyScale es);
     
+    arma::Mat<cx_double> expansion_coef2D(int M, int Mq, std::function<cx_double(double,double)> f, EnergyScale es,
+                                  std::string kernel_name = "Jackson", double lambda = 0.01);
+    
+    arma::Mat<cx_double> expansion_coef_optical(int M, int Mq, std::function<cx_double(double, double)> f, EnergyScale es,
+                                                double omega0, std::string kernel_name = "Jackson", double lambda = 0.01);
+    
     // Calculate \sum c_m mu_m
     double moment_product(Vec<double> const& c, Vec<double> const& mu);
+    // need further thinking if we only need the real part of mu
+    template <typename T>
+    T moment_product(arma::Mat<T> const& c, arma::Mat<T> const& mu);
     
     // Transformation of moments from mu to gamma, which corresponds to the density of states
     Vec<double> moment_transform(Vec<double> const& moments, int Mq);
+    
+    template <typename T>
+    arma::Mat<T> moment_transform(arma::Mat<T> const& moments, int Mq, std::string type = "gamma",
+                                  std::string kernel_name = "Jackson", double lambda = 0.01);
     
     // Calculate \int dx rho(x) f(x)
     double density_product(Vec<double> const& gamma, std::function<double(double)> f, EnergyScale es);
@@ -171,6 +189,8 @@ namespace fkpm {
     double electronic_energy(Vec<double> const& gamma, EnergyScale const& es, double kT, double filling, double mu);
     double electronic_energy(arma::vec const& evals, double kT, double filling);
     
+    // The integrand used for calculating optical conductivity
+    double integrand_OpticalConductivity(double x, double omega, double kT, double mu);
     
     // -- engine*.cpp ------------------------------------------------------------------------
     
@@ -196,6 +216,11 @@ namespace fkpm {
         
         // Chebyshev moments: mu_m = tr T_m(Hs) ~ tr R^\dagger T_m(Hs) R
         virtual Vec<double> moments(int M) = 0;
+        
+        // Chebyshev moments: mu_{m1,m2} = tr( T_{m1}(Hs) j1 T_{m2}(Hs) j2 )
+        // more to be improved, see the implementation
+        virtual arma::Mat<cx_double> moments_tensor(int M, arma::SpMat<T> const& j1,
+                                                    arma::SpMat<T> const& j2, int ncols_keep=0) = 0;
         
         // Approximates D ~ (xi R^\dagger + R xi^\dagger)/2 where xi = D R
         // and D ~ (\sum_m c_m T_m(Hs))R

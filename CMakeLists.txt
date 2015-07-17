@@ -50,6 +50,8 @@ find_package(Armadillo 4.400.2 REQUIRED CONFIG
 include_directories(SYSTEM ${ARMADILLO_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${ARMADILLO_LIBRARIES})
 
+# fftw to be added
+
 # Thread Building Blocks
 find_package(TBB)
 if (TBB_FOUND)

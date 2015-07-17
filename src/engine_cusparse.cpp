@@ -435,6 +435,11 @@ namespace fkpm {
             return mu;
         }
         
+        arma::Mat<cx_double> moments_tensor(int M, arma::SpMat<T> const& j1,
+                                            arma::SpMat<T> const& j2, int ncols_keep) {
+            return arma::zeros<arma::Mat<cx_double>>(M,M);
+        }
+        
         void stoch_matrix(Vec<double> const& c, SpMatBsr<T>& D) {
             TRY(cudaSetDevice(device));
             assert(D.n_rows == n_rows && D.n_cols == n_rows && D.b_len == b_len);
