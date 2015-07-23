@@ -32,6 +32,9 @@ namespace fkpm {
     template EnergyScale energy_scale(SpMatBsr<cx_float> const& H, double extra, double tolerance);
     template EnergyScale energy_scale(SpMatBsr<cx_double> const& H, double extra, double tolerance);
     
+    EnergyScale energy_scale(double low_input, double high_input) {
+        return {low_input, high_input};
+    }
     
     Vec<double> jackson_kernel(int M) {  // probably later merge to "set_kernel"?
         auto ret = Vec<double>(M);
@@ -90,49 +93,24 @@ namespace fkpm {
         return ret;
     }
     
-    arma::Mat<cx_double> expansion_coef2D(int M, int Mq, std::function<cx_double(double,double)> f, EnergyScale es,
-                                  std::string kernel_name, double lambda) {
+    // notice: for x_i which is too close to -1 or 1, f(x) may be ill defined
+    //         and thus causing numerical errors, so we should remove a few points
+    //         near -1 & 1
+    arma::Mat<double> expansion_coef_conductivity(int M, int Mq, std::function<double(double, double)> f,
+                                                  EnergyScale es, double omega0, std::string kernel_name, double lambda) {
         // TODO: replace with fftw
-        arma::Mat<cx_double> ret;
-        ret.zeros(M, M);
-        auto T_i = Vec<double>(M);
-        auto T_j = Vec<double>(M);
-        for (int i = 0; i < Mq; i++) {
-            double x_i = cos(Pi * (i+0.5) / Mq);
-            chebyshev_fill_array(x_i, T_i);
-            for (int j= 0; j < Mq; j++) {
-                double x_j = cos(Pi * (j+0.5) / Mq);
-                chebyshev_fill_array(x_j, T_j);
-                cx_double f_ij = f(es.unscale(x_i),es.unscale(x_j));
-                for (int m1 = 0; m1 < M; m1++) {
-                    for (int m2 = 0; m2 < M; m2++) {
-                        ret(m1,m2) += f_ij * T_i[m1] * T_j[m2];
-                    }
-                }
-            }
-        }
-        auto kernel = set_kernel(M, kernel_name, lambda);
-        for (int m1 = 0; m1 < M; m1++) {
-            for (int m2 = 0; m2 < M; m2++) {
-                ret(m1,m2) = (m1 == 0 ? 1.0 : 2.0) * (m2 ==0 ? 1.0 : 2.0)
-                            * kernel[m1] * kernel[m2] * ret(m1,m2) / ((cx_double) Mq) / ((cx_double) Mq);
-            }
-        }
-        return ret;
-    }
-    
-    arma::Mat<cx_double> expansion_coef_optical(int M, int Mq, std::function<cx_double(double, double)> f,
-                                                EnergyScale es, double omega0, std::string kernel_name, double lambda) {
-        // TODO: replace with fftw
+        assert(omega0 >= 0.0);
+        int n_neglect = 5;                 // neglect points near the boundary
         double omega = omega0 / es.mag();  // rescale omega
-        arma::Mat<cx_double> ret;
+        arma::Mat<double> ret;
         ret.zeros(M, M);
-        if (omega < 0.0 || omega >=2.0 ) return ret;
+        if (omega >= 2.0 ) return ret;
         
         auto T_i = Vec<double>(M);
         auto T_j = Vec<double>(M);
         int i_start  = ceil(acos(1.0 - omega) / Pi * Mq - 0.5);
-        for (int i = i_start; i < Mq; i++) {
+        if (i_start < 3) std::cout << "Warning: Need larger Mq!" << std::endl;
+        for (int i = i_start; i < Mq-n_neglect; i++) {
             double x_i = cos(Pi * (i+0.5) / Mq);
             chebyshev_fill_array(x_i + omega, T_i);
             chebyshev_fill_array(x_i, T_j);
@@ -148,11 +126,20 @@ namespace fkpm {
         for (int m1 = 0; m1 < M; m1++) {
             for (int m2 = 0; m2 < M; m2++) {
                 ret(m1,m2) = (m1 == 0 ? 1.0 : 2.0) * (m2 ==0 ? 1.0 : 2.0)
-                            * kernel[m1] * kernel[m2] * ret(m1,m2) / ((cx_double) Mq);
+                            * kernel[m1] * kernel[m2] * ret(m1,m2) / Mq;
             }
         }
         return ret;
+    }
+    
+    arma::Mat<cx_double> expansion_coef_conductivity(int M, int Mq, std::function<cx_double(double, double)> f,
+                                                     EnergyScale es, std::string kernel_name, double lambda) {
+        int n_neglect = 5;                 // neglect points near the boundary
+        arma::Mat<cx_double> ret;
+        ret.zeros(M, M);
         
+        
+        return ret;
     }
     
     Vec<double> moment_transform(Vec<double> const& moments, int Mq) {
@@ -177,14 +164,12 @@ namespace fkpm {
         return gamma;
     }
     
-    template <typename T>
-    arma::Mat<T> moment_transform(arma::Mat<T> const& moments, int Mq, std::string type,
-                                  std::string kernel_name, double lambda) {
+    arma::Mat<cx_double> moment_transform(arma::Mat<cx_double> const& moments, int Mq, std::string kernel_name, double lambda) {
         int M = moments.n_cols;
         auto T_i = Vec<double>(M);
         auto T_j = Vec<double>(M);
-        arma::Mat<T> mup(M, M);
-        arma::Mat<T> gamma(Mq, Mq);
+        arma::Mat<cx_double> mup(M, M);
+        arma::Mat<cx_double> gamma(Mq, Mq);
         
         auto kernel = set_kernel(M, kernel_name, lambda);
         for (int m1 = 0; m1 < M; m1++) {
@@ -207,19 +192,10 @@ namespace fkpm {
                                        * mup(m1, m2) * T_i[m1] * T_j[m2];
                     }
                 }
-                if (type == "fkpm") {
-                    gamma(i, j) /= (  Pi * sqrt(1.0 - x_i*x_i)
-                                    * Pi * sqrt(1.0 - x_j*x_j) );
-                }
             }
         }
         return gamma;
     }
-    
-    template arma::Mat<double> moment_transform(arma::Mat<double> const& moments, int Mq, std::string type,
-                                                std::string kernel_name, double lambda);
-    template arma::Mat<cx_double> moment_transform(arma::Mat<cx_double> const& moments, int Mq, std::string type,
-                                                   std::string kernel_name, double lambda);
     
     double moment_product(Vec<double> const& c, Vec<double> const& mu) {
         int M = c.size();
@@ -232,14 +208,16 @@ namespace fkpm {
 
     // need further think about type
     template <typename T>
-    T moment_product(arma::Mat<T> const& c, arma::Mat<T> const& mu) {
+    cx_double moment_product(arma::Mat<T> const& c, arma::Mat<cx_double> const& mu) {
         int M1 = c.n_rows;
         int M2 = c.n_cols;
         assert(mu.n_rows == M1);
         assert(mu.n_cols == M2);
-        return arma::accu(c % mu);
+        cx_double ret;
+        ret = arma::accu(c % mu);
+        return ret;
     }
-    template double moment_product(arma::Mat<double> const& c, arma::Mat<double> const& mu);
+    template cx_double moment_product(arma::Mat<double> const& c, arma::Mat<cx_double> const& mu);
     template cx_double moment_product(arma::Mat<cx_double> const& c, arma::Mat<cx_double> const& mu);
     
     double density_product(Vec<double> const& gamma, std::function<double(double)> f, EnergyScale es) {
@@ -260,6 +238,28 @@ namespace fkpm {
             double x_i = cos(Pi * (i+0.5) / Mq);
             x[Mq-1-i] = es.unscale(x_i);
             rho[Mq-1-i] = gamma[i] / (Pi * sqrt(1-x_i*x_i) * es.mag());
+        }
+    }
+    
+    void density_function(arma::Mat<cx_double> const& gamma, EnergyScale es, Vec<double>& x, Vec<double>& y, arma::mat& rho) {
+        int Mq1 = gamma.n_rows;
+        int Mq2 = gamma.n_cols;
+        x.resize(Mq1);
+        y.resize(Mq2);
+        rho.resize(Mq1, Mq2);
+        for (int i2 = Mq2-1; i2 >= 0; i2--) {
+            double x2   = cos(Pi * (i2+0.5) / Mq2);
+            y[Mq2-1-i2] = es.unscale(x2);
+        }
+        for (int i1 = Mq1-1; i1 >= 0; i1--) {
+            double x1   = cos(Pi * (i1+0.5) / Mq1);
+            x[Mq1-1-i1] = es.unscale(x1);
+            for (int i2 = Mq2-1; i2 >= 0; i2--) {
+                double x2 = cos(Pi * (i2+0.5) / Mq2);
+                rho(Mq1-1-i1, Mq2-1-i2) = std::real(gamma(i1, i2)) / (Pi * sqrt(1.0 - x1*x1)
+                                                                    * Pi * sqrt(1.0 - x2*x2)
+                                                                    * es.mag() * es.mag());
+            }
         }
     }
     
@@ -378,6 +378,6 @@ namespace fkpm {
     }
     
     double integrand_OpticalConductivity(double x, double omega, double kT, double mu) {
-        return fermi_density(x, kT, mu) - fermi_density(x + omega, kT, mu);
+        return (fermi_density(x, kT, mu) - fermi_density(x + omega, kT, mu)) * Pi / omega;
     }
 }

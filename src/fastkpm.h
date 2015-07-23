@@ -124,6 +124,7 @@ namespace fkpm {
     // Use Lanczos to bound eigenvalues of H, and determine appropriate rescaling
     template <typename T>
     EnergyScale energy_scale(SpMatBsr<T> const& H, double extend, double tolerance);
+    EnergyScale energy_scale(double low_input, double high_input);
     
     // Used to damp Gibbs oscillations in KPM estimates
     Vec<double> jackson_kernel(int M);
@@ -138,30 +139,32 @@ namespace fkpm {
     // Coefficients c_m that satisfy f(x) = \sum_m T_m(x) c_m
     Vec<double> expansion_coefficients(int M, int Mq, std::function<double(double)> f, EnergyScale es);
     
-    arma::Mat<cx_double> expansion_coef2D(int M, int Mq, std::function<cx_double(double,double)> f, EnergyScale es,
-                                  std::string kernel_name = "Jackson", double lambda = 0.01);
-    
-    arma::Mat<cx_double> expansion_coef_optical(int M, int Mq, std::function<cx_double(double, double)> f, EnergyScale es,
-                                                double omega0, std::string kernel_name = "Jackson", double lambda = 0.01);
+    // Optical conductivity
+    arma::Mat<double> expansion_coef_conductivity(int M, int Mq, std::function<double(double, double)> f, EnergyScale es,
+                                                  double omega0, std::string kernel_name = "Jackson", double lambda = 0.01);
+    // Static conductivity
+    arma::Mat<cx_double> expansion_coef_conductivity(int M, int Mq, std::function<cx_double(double, double)> f,
+                                                     EnergyScale es, std::string kernel_name, double lambda);
     
     // Calculate \sum c_m mu_m
     double moment_product(Vec<double> const& c, Vec<double> const& mu);
     // need further thinking if we only need the real part of mu
     template <typename T>
-    T moment_product(arma::Mat<T> const& c, arma::Mat<T> const& mu);
+    cx_double moment_product(arma::Mat<T> const& c, arma::Mat<cx_double> const& mu);
     
     // Transformation of moments from mu to gamma, which corresponds to the density of states
     Vec<double> moment_transform(Vec<double> const& moments, int Mq);
     
-    template <typename T>
-    arma::Mat<T> moment_transform(arma::Mat<T> const& moments, int Mq, std::string type = "gamma",
-                                  std::string kernel_name = "Jackson", double lambda = 0.01);
+    arma::Mat<cx_double> moment_transform(arma::Mat<cx_double> const& moments, int Mq,
+                                          std::string kernel_name = "Jackson", double lambda = 0.01);
     
     // Calculate \int dx rho(x) f(x)
     double density_product(Vec<double> const& gamma, std::function<double(double)> f, EnergyScale es);
     
     // Density of states rho(x) at Chebyshev points x
     void density_function(Vec<double> const& gamma, EnergyScale es, Vec<double>& x, Vec<double>& rho);
+    // for two dimensional expansion, "rho" returns real part of j(x,y)
+    void density_function(arma::Mat<cx_double> const& gamma, EnergyScale es, Vec<double>& x, Vec<double>& y, arma::mat& rho);
     
     // Density of states \int theta(x-x') rho(x') dx' at Chebyshev points x
     void integrated_density_function(Vec<double> const& gamma, EnergyScale es, Vec<double>& x, Vec<double>& irho);
@@ -217,7 +220,7 @@ namespace fkpm {
         // Chebyshev moments: mu_m = tr T_m(Hs) ~ tr R^\dagger T_m(Hs) R
         virtual Vec<double> moments(int M) = 0;
         
-        // Chebyshev moments: mu_{m1,m2} = tr( T_{m1}(Hs) j1 T_{m2}(Hs) j2 )
+        // Chebyshev moments: mu_{m1,m2} = tr( j1 T_{m1}(Hs) j2 T_{m2}(Hs) )
         // more to be improved, see the implementation
         virtual arma::Mat<cx_double> moments_tensor(int M, arma::SpMat<T> const& j1,
                                                     arma::SpMat<T> const& j2, int ncols_keep=0) = 0;
