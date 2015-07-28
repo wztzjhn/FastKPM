@@ -1,4 +1,5 @@
 #include <armadillo>
+#include <cassert>
 #include "fastkpm.h"
 
 namespace fkpm {
@@ -24,6 +25,7 @@ namespace fkpm {
     
     template <typename T>
     void SpMatElems<T>::add(int i, int j, T const* v) {
+        assert(i >= 0 && i < n_rows && j >= 0 && j < n_cols);
         row_idx.push_back(i);
         col_idx.push_back(j);
         val.insert(val.end(), v, v+b_len*b_len);

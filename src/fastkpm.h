@@ -133,30 +133,29 @@ namespace fkpm {
     // Kernel which can accept "Jackson"(default) or "Lorentz", where lambda can be set for Lorentz Kernel
     Vec<double> set_kernel(int M, std::string kernel_name = "Jackson", double lambda = 0.01);
     
-    // Chebyshev polynomials T_m(x) evaluated at x
-    void chebyshev_fill_array(double x, Vec<double>& ret);
+    // Chebyshev polynomials evaluated at x, default to be the first kind T_m(x)
+    // if kind == 2, fill the second kind U_m(x)
+    void chebyshev_fill_array(double x, Vec<double>& ret, int kind = 1);
     
     // Coefficients c_m that satisfy f(x) = \sum_m T_m(x) c_m
     Vec<double> expansion_coefficients(int M, int Mq, std::function<double(double)> f, EnergyScale es);
     
     // Optical conductivity
-    arma::Mat<double> expansion_coef_conductivity(int M, int Mq, std::function<double(double, double)> f, EnergyScale es,
-                                                  double omega0, std::string kernel_name = "Jackson", double lambda = 0.01);
+    Vec<Vec<double>> expansion_coef_conductivity(int M, int Mq, std::function<double(double)> f, EnergyScale es,
+                                                  double omega0, Vec<double>& kernel);
     // Static conductivity
-    arma::Mat<cx_double> expansion_coef_conductivity(int M, int Mq, std::function<cx_double(double, double)> f,
-                                                     EnergyScale es, std::string kernel_name, double lambda);
+    Vec<Vec<cx_double>> expansion_coef_conductivity(int M, int Mq, std::function<double(double)> f, EnergyScale es, Vec<double>& kernel);
     
     // Calculate \sum c_m mu_m
     double moment_product(Vec<double> const& c, Vec<double> const& mu);
     // need further thinking if we only need the real part of mu
     template <typename T>
-    cx_double moment_product(arma::Mat<T> const& c, arma::Mat<cx_double> const& mu);
+    cx_double moment_product(Vec<Vec<T>> const& c, Vec<Vec<cx_double>> const& mu);
     
     // Transformation of moments from mu to gamma, which corresponds to the density of states
     Vec<double> moment_transform(Vec<double> const& moments, int Mq);
     
-    arma::Mat<cx_double> moment_transform(arma::Mat<cx_double> const& moments, int Mq,
-                                          std::string kernel_name = "Jackson", double lambda = 0.01);
+    Vec<Vec<cx_double>> moment_transform(Vec<Vec<cx_double>>const& moments, int Mq, Vec<double>& kernel);
     
     // Calculate \int dx rho(x) f(x)
     double density_product(Vec<double> const& gamma, std::function<double(double)> f, EnergyScale es);
@@ -164,7 +163,7 @@ namespace fkpm {
     // Density of states rho(x) at Chebyshev points x
     void density_function(Vec<double> const& gamma, EnergyScale es, Vec<double>& x, Vec<double>& rho);
     // for two dimensional expansion, "rho" returns real part of j(x,y)
-    void density_function(arma::Mat<cx_double> const& gamma, EnergyScale es, Vec<double>& x, Vec<double>& y, arma::mat& rho);
+    void density_function(Vec<Vec<cx_double>> const& gamma, EnergyScale es, Vec<double>& x, Vec<double>& y, Vec<Vec<double>>& rho);
     
     // Density of states \int theta(x-x') rho(x') dx' at Chebyshev points x
     void integrated_density_function(Vec<double> const& gamma, EnergyScale es, Vec<double>& x, Vec<double>& irho);
@@ -192,8 +191,8 @@ namespace fkpm {
     double electronic_energy(Vec<double> const& gamma, EnergyScale const& es, double kT, double filling, double mu);
     double electronic_energy(arma::vec const& evals, double kT, double filling);
     
-    // The integrand used for calculating optical conductivity
-    double integrand_OpticalConductivity(double x, double omega, double kT, double mu);
+    // The integrand used for calculating conductivity
+    double integrand_Conductivity(double x, double omega, double kT, double mu);
     
     // -- engine*.cpp ------------------------------------------------------------------------
     
@@ -222,8 +221,8 @@ namespace fkpm {
         
         // Chebyshev moments: mu_{m1,m2} = tr( j1 T_{m1}(Hs) j2 T_{m2}(Hs) )
         // more to be improved, see the implementation
-        virtual arma::Mat<cx_double> moments_tensor(int M, arma::SpMat<T> const& j1,
-                                                    arma::SpMat<T> const& j2, int ncols_keep=0) = 0;
+        virtual Vec<Vec<cx_double>> moments_tensor(int M, SpMatBsr<T> const& j1_BSR,
+                                                   SpMatBsr<T> const& j2_BSR, int ncols_keep=10) = 0;
         
         // Approximates D ~ (xi R^\dagger + R xi^\dagger)/2 where xi = D R
         // and D ~ (\sum_m c_m T_m(Hs))R

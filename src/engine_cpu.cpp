@@ -11,15 +11,6 @@ namespace fkpm {
         arma::Mat<T> a0;
         arma::Mat<T> a1;
         arma::Mat<T> a2;
-// redefine a & atilde, no longer storing all columns of independent random variables
-// in the new structure:
-//     each row: represents the order of Chebyshev polynomial
-//     each col: a_k(0:N-1) same dimension as the hamiltonian
-// Later in the code: we can probably clean up a0,a1,a2
-        arma::Mat<T> alpha;         // size depends on memory usage
-        arma::Mat<T> atild;
-        const int max_elems = 1e7;  // 1e7 elements ~ 100M memory to store alpha
-        
         
         void set_H(SpMatBsr<T> const& H, EnergyScale const& es) {
             assert(H.n_rows == H.n_cols);
@@ -54,15 +45,23 @@ namespace fkpm {
             return mu;
         }
 
-        arma::Mat<cx_double> moments_tensor(int M, arma::SpMat<T> const& j1,
-                                            arma::SpMat<T> const& j2, int ncols_keep) {
+        Vec<Vec<cx_double>> moments_tensor(int M, SpMatBsr<T> const& j1_BSR, SpMatBsr<T> const& j2_BSR, int ncols_keep) {
             std::cout << "Calculating Moments Tensor..." << std::endl;
+            //     each row: represents the order of Chebyshev polynomial
+            //     each col: a_k(0:N-1) same dimension as the hamiltonian
+            arma::Mat<T> alpha;         // size depends on memory usage
+            arma::Mat<T> atild;
+            //const int max_elems = 1e7;  // 1e7 elements ~ 100M memory to store alpha
+            
+            auto j1 = j1_BSR.to_arma();
+            auto j2 = j2_BSR.to_arma();
             int n = this->R.n_rows;
             int alpha_ncols;
             if (ncols_keep >= 3 && ncols_keep <= M) {
                 alpha_ncols = ncols_keep;
             } else {
-                alpha_ncols = std::min(max_elems/n, M);
+                alpha_ncols = 10;
+                //alpha_ncols = std::min(max_elems/n, M);
             }
             int atild_ncols = alpha_ncols;
             assert(alpha_ncols >= 3);
@@ -73,12 +72,14 @@ namespace fkpm {
 
             alpha.set_size(n,alpha_ncols);
             atild.set_size(n,atild_ncols);
-            arma::Mat<cx_double> mu(M, M);
-            mu.zeros();                                  // initialize mu to 0
-            mu(0,0) = arma::trace(j2 * j1);
-            mu(0,1) = arma::trace(j2 * Hs * j1);
-            mu(1,0) = arma::trace(Hs * j2 * j1);
-            mu(1,1) = arma::trace(Hs * j2 * Hs * j1);
+            Vec<Vec<cx_double>> mu(M);
+            for (int i = 0; i < M; i++) {                   // initialize mu to 0
+                mu[i].resize(M, cx_double(0.0,0.0));
+            }
+            mu[0][0] = arma::trace(j2 * j1);
+            mu[0][1] = arma::trace(j2 * Hs * j1);
+            mu[1][0] = arma::trace(Hs * j2 * j1);
+            mu[1][1] = arma::trace(Hs * j2 * Hs * j1);
             
             // random number averaging, this loop can be MPI parallized
             // # of sparse * vector operation: O(M^2 * s) if naive, or O(M * s) in the block way
@@ -108,7 +109,7 @@ namespace fkpm {
                             atild.col(m2) = 2 * Hs * atild.col(m2-1) - atild.col(m2-2);
                         for (int m1 = alpha_begin; m1 <= alpha_end; m1++) {
                             for (int m2 = atild_begin; m2 <= atild_end; m2++) {
-                                mu(m1,m2) += (m1>1 || m2>1)?arma::cdot(alpha.col(m1-alpha_begin), j2 * atild.col(m2-atild_begin)):0.0;
+                                mu[m1][m2] += (m1>1 || m2>1)?arma::cdot(alpha.col(m1-alpha_begin), j2 * atild.col(m2-atild_begin)):0.0;
                             }
                         }
                         atild_begin = atild_end + 1;
@@ -122,6 +123,8 @@ namespace fkpm {
             std::cout << " -> 100%." << std::endl;
             alpha.reset();
             atild.reset();
+            j1.reset();
+            j2.reset();
             
 //            std::cout << "-----This part only for Bench Marking-----" << std::endl;
 //            arma::Mat<cx_double> mu_test(M, M);
