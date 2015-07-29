@@ -183,10 +183,10 @@ namespace fkpm {
         void set_R_uncorrelated(int n, int s, RNG& rng);
         
         // Correlated random elements with mostly orthogonal rows
-        void set_R_correlated(Vec<int> const& groups, RNG& rng);
+        void set_R_correlated(Vec<int> const& groups, RNG& rng, int j_start = 0, int j_end = 0);
         
         // Identity matrix
-        void set_R_identity(int n);
+        void set_R_identity(int n, int j_start = 0, int j_end = 0);
         
         // Transfer R matrix to device
         virtual void transfer_R() {}

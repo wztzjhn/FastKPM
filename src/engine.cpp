@@ -44,26 +44,44 @@ namespace fkpm {
     }
     
     template <typename T>
-    void Engine<T>::set_R_correlated(Vec<int> const& groups, RNG& rng) {
+    void Engine<T>::set_R_correlated(Vec<int> const& groups, RNG& rng, int j_start, int j_end) {
         auto minmax = std::minmax_element(groups.begin(), groups.end());
         assert(*minmax.first == 0);
-        int s = *minmax.second + 1;
+        assert(*minmax.second >= 0);
+        
+        if (j_start <= 0) j_start = 0;
+        if (j_end <= 0) j_end = *minmax.second + 1;
+        assert (j_start < j_end);
+        
         int n = groups.size();
+        int s = j_end - j_start;
+        if (s > n) {
+            std::cerr << "Inefficiency warning: Using more random vectors than matrix rows!\n";
+        }
+        
         R.set_size(n, s);
         R.fill(0.0);
-        for (int i = 0; i < n; i++) {
-            int g = groups[i];
-            R(i, g) = random_phase<T>(rng);
+        for (int j = j_start; j < j_end; j++) {
+            RNG rng_j(rng()); // new RNG sequence for each column j
+            for (int i = 0; i < n; i++) {
+                if (groups[i] == j) {
+                    R(i, j-j_start) = random_phase<T>(rng_j);
+                }
+            }
         }
         transfer_R();
     }
     
     template <typename T>
-    void Engine<T>::set_R_identity(int n) {
-        R.set_size(n, n);
+    void Engine<T>::set_R_identity(int n, int j_start, int j_end) {
+        if (j_start <= 0) j_start = 0;
+        if (j_end <= 0) j_end = n;
+        assert (0 <= j_start && j_start < j_end && j_end <= n);
+        
+        R.set_size(n, j_end-j_start);
         R.fill(0.0);
-        for (int i = 0; i < n; i++) {
-            R(i, i) = 1.0;
+        for (int j = j_start; j < j_end; j++) {
+            R(j, j-j_start) = 1.0;
         }
         transfer_R();
     }
