@@ -64,7 +64,107 @@ namespace fkpm {
                 //alpha_ncols = std::min(max_elems/n, M);
             }
             int atild_ncols = alpha_ncols;
-            assert(alpha_ncols >= 3);
+            assert(Hs.n_rows == n && Hs.n_cols == n);
+            assert(j1.n_rows == n && j1.n_cols == n);
+            assert(j2.n_rows == n && j2.n_cols == n);
+            assert(M % 2 == 0);
+            
+            alpha.set_size(n,alpha_ncols);
+            atild.set_size(n,atild_ncols);
+            Vec<Vec<cx_double>> mu(M);
+            for (int i = 0; i < M; i++) {                   // initialize mu to 0
+                mu[i].resize(M, cx_double(0.0,0.0));
+            }
+            //mu[0][0] = arma::trace(j2 * j1);
+            //mu[0][1] = arma::trace(j2 * Hs * j1);
+            //mu[1][0] = arma::trace(Hs * j2 * j1);
+            //mu[1][1] = arma::trace(Hs * j2 * Hs * j1);
+            
+            // # of sparse * vector operation: O(M^2 * s) if naive, or O(M * s) in the block way
+            // # of vector * vector operation: O(M^2 * s) so dominant in time
+            for (int k=0; k < this->R.n_cols; k++) {
+                int alpha_begin = 0;                        // *** divide the calculation into blocks, each
+                int alpha_end   = alpha_ncols - 1;          //     dimension with two pointers for boundary ***
+                alpha.col(0)    = this->R.col(k);           // \alpha_0
+                alpha.col(1)    = Hs * alpha.col(0);        // \alpha_1
+                while (alpha_begin <= alpha_end) {
+                    if (alpha_begin != 0) {                 // build alpha.col(begin:end)
+                        alpha.col(0) = 2 * Hs * alpha.col(alpha_ncols-1) - alpha.col(alpha_ncols-2);
+                        alpha.col(1) = 2 * Hs * alpha.col(0) - alpha.col(alpha_ncols-1);
+                    }
+                    for (int m1 = 2; m1 <= alpha_end - alpha_begin; m1++)
+                        alpha.col(m1) = 2 * Hs * alpha.col(m1-1) - alpha.col(m1-2);
+                    int atild_begin = 0;
+                    int atild_end   = atild_ncols - 1;
+                    atild.col(0)    = j1 * this->R.col(k);  // reset \tilde{alpha}
+                    atild.col(1)    = Hs * atild.col(0);
+                    while (atild_begin <= atild_end) {
+                        if (atild_begin != 0) {             // build atild.col(begin:end)
+                            atild.col(0) = 2 * Hs * atild.col(atild_ncols-1) - atild.col(atild_ncols-2);
+                            atild.col(1) = 2 * Hs * atild.col(0) - atild.col(atild_ncols-1);
+                        }
+                        for (int m2 = 2; m2 <= atild_end - atild_begin; m2++)
+                            atild.col(m2) = 2 * Hs * atild.col(m2-1) - atild.col(m2-2);
+                        for (int m1 = alpha_begin; m1 <= alpha_end; m1++) {
+                            for (int m2 = atild_begin; m2 <= atild_end; m2++) {
+                                mu[m1][m2] += arma::cdot(alpha.col(m1-alpha_begin), j2 * atild.col(m2-atild_begin));
+                            }
+                        }
+                        atild_begin = atild_end + 1;
+                        atild_end   = std::min(M-1, atild_end + atild_ncols);
+                    }
+                    alpha_begin = alpha_end + 1;
+                    alpha_end   = std::min(M-1, alpha_end + alpha_ncols);
+                }
+                std::cout << "*";
+            }
+            std::cout << " -> 100%." << std::endl;
+            alpha.reset();
+            atild.reset();
+            
+            
+//                        std::cout << "-----This part only for Bench Marking-----" << std::endl;
+//                        arma::Mat<cx_double> mu_test(M, M);
+//                        mu_test.zeros();
+//                        Vec<arma::Mat<T>> cheby(M);
+//                        cheby[0].eye(n,n);
+//                        cheby[1] = Hs;
+//                        for (int m=2; m < M; m++) {
+//                            cheby[m] = 2 * Hs * cheby[m-1] - cheby[m-2];
+//                        }
+//                        for (int m1=0; m1 < M; m1++) {
+//                            for (int m2=0; m2 < M; m2++) {
+//                                mu_test(m1,m2)=arma::trace(cheby[m1]*j2*cheby[m2]*j1);
+//                                if (std::abs(mu[m1][m2]-mu_test(m1,m2))>1e-12) {
+//                                    std::cout << "error(" << m1 << "," << m2 << ")=" << mu[m1][m2]-mu_test(m1,m2) << std::endl;
+//                                }
+//                            }
+//                        }
+            
+            j1.reset();
+            j2.reset();
+            return mu;
+        }
+
+        Vec<Vec<cx_double>> moments_tensor_version0(int M, SpMatBsr<T> const& j1_BSR, SpMatBsr<T> const& j2_BSR, int ncols_keep) {
+            std::cout << "Calculating Moments Tensor..." << std::endl;
+            //     each row: represents the order of Chebyshev polynomial
+            //     each col: a_k(0:N-1) same dimension as the hamiltonian
+            arma::Mat<T> alpha;         // size depends on memory usage
+            arma::Mat<T> atild;
+            //const int max_elems = 1e7;  // 1e7 elements ~ 100M memory to store alpha
+            
+            auto j1 = j1_BSR.to_arma();
+            auto j2 = j2_BSR.to_arma();
+            int n = this->R.n_rows;
+            int alpha_ncols;
+            if (ncols_keep >= 3 && ncols_keep <= M) {
+                alpha_ncols = ncols_keep;
+            } else {
+                alpha_ncols = 10;
+                //alpha_ncols = std::min(max_elems/n, M);
+            }
+            int atild_ncols = alpha_ncols;
             assert(Hs.n_rows == n && Hs.n_cols == n);
             assert(j1.n_rows == n && j1.n_cols == n);
             assert(j2.n_rows == n && j2.n_cols == n);
@@ -125,25 +225,6 @@ namespace fkpm {
             atild.reset();
             j1.reset();
             j2.reset();
-            
-//            std::cout << "-----This part only for Bench Marking-----" << std::endl;
-//            arma::Mat<cx_double> mu_test(M, M);
-//            mu_test.zeros();
-//            Vec<arma::Mat<T>> cheby(M);
-//            cheby[0].eye(n,n);
-//            cheby[1] = Hs;
-//            for (int m=2; m < M; m++) {
-//                cheby[m] = 2 * Hs * cheby[m-1] - cheby[m-2];
-//            }
-//            for (int m1=0; m1 < M; m1++) {
-//                for (int m2=0; m2 < M; m2++) {
-//                    mu_test(m1,m2)=arma::trace(cheby[m1]*j1*cheby[m2]*j2);
-//                    if (std::abs(mu(m1,m2)-mu_test(m1,m2))>1e-12) {
-//                        std::cout << "error(" << m1 << "," << m2 << ")=" << mu(m1,m2)-mu_test(m1,m2) << std::endl;
-//                    }
-//                }
-//            }
-            
             return mu;
         }
         

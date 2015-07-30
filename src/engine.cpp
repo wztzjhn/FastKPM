@@ -105,6 +105,7 @@ namespace fkpm {
         if (ret == nullptr)
             ret = mk_engine_cpu<T>();
         return ret;
+//        return mk_engine_cpu<T>();       // for testing cpu code only
     }
     template std::shared_ptr<Engine<float>> mk_engine();
     template std::shared_ptr<Engine<double>> mk_engine();
