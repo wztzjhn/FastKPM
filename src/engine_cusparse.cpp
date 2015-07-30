@@ -404,11 +404,15 @@ namespace fkpm {
             assert(M % 2 == 0);
             
             Vec<double> mu(M);
-            mu[0] = b_len*n_rows;
-            mu[1] = Hs_trace;
             
             a_d[0].from_device(R_d);            // a0 = \alpha_0 = R
             cgemm_H(1, R_d, 0, a_d[1]);         // a1 = \alpha_1 = H R
+            
+            T_cu result1, result2;
+            TRY(gen_dotc(bl_handle, this->R.size(), (T_cu *)a_d[0].ptr, 1, (T_cu *)a_d[0].ptr, 1, &result1));
+            TRY(gen_dotc(bl_handle, this->R.size(), (T_cu *)a_d[1].ptr, 1, (T_cu *)a_d[0].ptr, 1, &result2));
+            mu[0] = cuda_real(result1);
+            mu[1] = cuda_real(result2);
             
             for (int m = 1; m < M/2; m++) {
                 a_d[2].from_device(a_d[0]);
@@ -486,19 +490,17 @@ namespace fkpm {
             for (int m = 1; m < M/2; m++) {
                 diag -= c[2*m+1];
             }
-            D.zeros();
-            for (int k = 0; k < D.n_blocks(); k++) {
-                if (D.row_idx[k] == D.col_idx[k]) {
-                    T* v = &D.val[b_len*b_len*k];
-                    for (int bi = 0; bi < b_len; bi++) {
-                        v[b_len*bi + bi] = diag;
-                    }
-                }
-            }
             
+            D.zeros();
             DRowIndex_d.from_host(D.row_idx.size(), D.row_idx.data());
             DColIndex_d.from_host(D.col_idx.size(), D.col_idx.data());
             DVal_d.from_host(D.val.size(), D.val.data());
+            
+            // D += diag R R^\dagger
+            outer_product(n_rows, b_len, this->R.n_cols, T_re(diag), (T_cu *)R_d.ptr, (T_cu *)R_d.ptr,
+                          D.n_blocks(), DRowIndex_d.ptr, DColIndex_d.ptr, (T_cu *)DVal_d.ptr);
+            TRY(cudaPeekAtLastError());
+            TRY(cudaDeviceSynchronize());
             
             // b1 = \beta_{M/2+1}, b0 = \beta_{M/2}
             b_d[1].memset(0);
