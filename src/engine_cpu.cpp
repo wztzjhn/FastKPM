@@ -29,11 +29,11 @@ namespace fkpm {
             assert(M % 2 == 0);
             
             Vec<double> mu(M);
-            mu[0] = n;
-            mu[1] = std::real(arma::trace(Hs));
             
             a0 = this->R;        // \alpha_0
             a1 = Hs * this->R;   // \alpha_1
+            mu[0] = std::real(arma::cdot(a0, a0));
+            mu[1] = std::real(arma::cdot(a1, a0));
             
             for (int m = 1; m < M/2; m++) {
                 a2 = 2*Hs*a1 - a0;
@@ -101,14 +101,7 @@ namespace fkpm {
                 diag -= c[2*m+1];
             }
             D.zeros();
-            for (int k = 0; k < D.n_blocks(); k++) {
-                if (D.row_idx[k] == D.col_idx[k]) {
-                    T* v = &D.val[D.b_len*D.b_len*k];
-                    for (int bi = 0; bi < D.b_len; bi++) {
-                        v[D.b_len*bi + bi] = diag;
-                    }
-                }
-            }
+            outer_product(diag, this->R, this->R, D);
             
             // Note that the \beta_m matrices are the "adjoint nodes" to alpha_m. Specifically,
             // \beta^*_m = (d / d\alpha_m) tr g,
