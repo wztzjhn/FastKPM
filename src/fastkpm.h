@@ -138,9 +138,6 @@ namespace fkpm {
     // Coefficients c_m that satisfy f(x) = \sum_m T_m(x) c_m
     Vec<double> expansion_coefficients(int M, int Mq, std::function<double(double)> f, EnergyScale es);
     
-    // Optical conductivity
-    //     Vec<Vec<cx_double>> electrical_conductivity_coefficients(int M, int Mq, double kT, double mu, double omega, EnergyScale es, Vec<double>& kernel);
-
     // C_{mn} for optical conductivity (finite omega) or static conductivity (zero omega)
     Vec<Vec<cx_double>> electrical_conductivity_coefficients(int M, int Mq, double kT, double mu, double omega, EnergyScale es, Vec<double> const& kernel);
     
@@ -212,8 +209,8 @@ namespace fkpm {
         virtual Vec<double> moments(int M) = 0;
         
         // Chebyshev moments: mu_{m1,m2} = tr( j1 T_{m1}(Hs) j2 T_{m2}(Hs) )
-        virtual Vec<Vec<cx_double>> moments_tensor(int M, SpMatBsr<T> const& j1_BSR,
-                                                   SpMatBsr<T> const& j2_BSR, int ncols_keep=10) = 0;
+        virtual Vec<Vec<cx_double>> moments_tensor(int M, SpMatBsr<T> const& j1op,
+                                                   SpMatBsr<T> const& j2op, int a_chunk_ncols=-1) = 0;
         
         // Approximates D ~ (xi R^\dagger + R xi^\dagger)/2 where xi = D R
         // and D ~ (\sum_m c_m T_m(Hs))R
