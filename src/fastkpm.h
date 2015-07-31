@@ -124,14 +124,12 @@ namespace fkpm {
     // Use Lanczos to bound eigenvalues of H, and determine appropriate rescaling
     template <typename T>
     EnergyScale energy_scale(SpMatBsr<T> const& H, double extend, double tolerance);
-    EnergyScale energy_scale(double low_input, double high_input);
     
-    // Used to damp Gibbs oscillations in KPM estimates
+    // Optimally damp Gibbs oscillations in KPM estimates
     Vec<double> jackson_kernel(int M);
     
-    // Used to damp Gibbs oscillations in KPM estimates
-    // Kernel which can accept "Jackson"(default) or "Lorentz", where lambda can be set for Lorentz Kernel
-    Vec<double> set_kernel(int M, std::string kernel_name = "Jackson", double lambda = 0.01);
+    // Damp Gibbs oscillations while preserving complex analytic behavior
+    Vec<double> lorentz_kernel(int M, double lambda);
     
     // Chebyshev polynomials evaluated at x, default to be the first kind T_m(x)
     // if kind == 2, fill the second kind U_m(x)
@@ -141,29 +139,26 @@ namespace fkpm {
     Vec<double> expansion_coefficients(int M, int Mq, std::function<double(double)> f, EnergyScale es);
     
     // Optical conductivity
-    Vec<Vec<double>> expansion_coef_conductivity(int M, int Mq, std::function<double(double)> f, EnergyScale es,
-                                                  double omega0, Vec<double>& kernel);
-    // Static conductivity
-    Vec<Vec<cx_double>> expansion_coef_conductivity(int M, int Mq, std::function<double(double)> f, EnergyScale es, Vec<double>& kernel);
+    //     Vec<Vec<cx_double>> electrical_conductivity_coefficients(int M, int Mq, double kT, double mu, double omega, EnergyScale es, Vec<double>& kernel);
+
+    // C_{mn} for optical conductivity (finite omega) or static conductivity (zero omega)
+    Vec<Vec<cx_double>> electrical_conductivity_coefficients(int M, int Mq, double kT, double mu, double omega, EnergyScale es, Vec<double> const& kernel);
     
     // Calculate \sum c_m mu_m
     double moment_product(Vec<double> const& c, Vec<double> const& mu);
-    // need further thinking if we only need the real part of mu
-    template <typename T>
-    cx_double moment_product(Vec<Vec<T>> const& c, Vec<Vec<cx_double>> const& mu);
+    cx_double moment_product(Vec<Vec<cx_double>> const& c, Vec<Vec<cx_double>> const& mu);
     
     // Transformation of moments from mu to gamma, which corresponds to the density of states
     Vec<double> moment_transform(Vec<double> const& moments, int Mq);
-    
-    Vec<Vec<cx_double>> moment_transform(Vec<Vec<cx_double>>const& moments, int Mq, Vec<double>& kernel);
+    Vec<Vec<cx_double>> moment_transform(Vec<Vec<cx_double>> const& moments, int Mq, Vec<double> const& kernel);
     
     // Calculate \int dx rho(x) f(x)
     double density_product(Vec<double> const& gamma, std::function<double(double)> f, EnergyScale es);
     
     // Density of states rho(x) at Chebyshev points x
     void density_function(Vec<double> const& gamma, EnergyScale es, Vec<double>& x, Vec<double>& rho);
-    // for two dimensional expansion, "rho" returns real part of j(x,y)
-    void density_function(Vec<Vec<cx_double>> const& gamma, EnergyScale es, Vec<double>& x, Vec<double>& y, Vec<Vec<double>>& rho);
+    // Generalized density map in 2d, involving "sandwiched" current operator
+    void density_function(Vec<Vec<cx_double>> const& gamma, EnergyScale es, Vec<double>& x, Vec<double>& y, Vec<Vec<cx_double>>& rho);
     
     // Density of states \int theta(x-x') rho(x') dx' at Chebyshev points x
     void integrated_density_function(Vec<double> const& gamma, EnergyScale es, Vec<double>& x, Vec<double>& irho);
@@ -191,9 +186,6 @@ namespace fkpm {
     double electronic_energy(Vec<double> const& gamma, EnergyScale const& es, double kT, double filling, double mu);
     double electronic_energy(arma::vec const& evals, double kT, double filling);
     
-    // The integrand used for calculating conductivity
-    double integrand_Conductivity(double x, double omega, double kT, double mu);
-    
     // -- engine*.cpp ------------------------------------------------------------------------
     
     template <typename T>
@@ -220,7 +212,6 @@ namespace fkpm {
         virtual Vec<double> moments(int M) = 0;
         
         // Chebyshev moments: mu_{m1,m2} = tr( j1 T_{m1}(Hs) j2 T_{m2}(Hs) )
-        // more to be improved, see the implementation
         virtual Vec<Vec<cx_double>> moments_tensor(int M, SpMatBsr<T> const& j1_BSR,
                                                    SpMatBsr<T> const& j2_BSR, int ncols_keep=10) = 0;
         

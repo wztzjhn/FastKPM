@@ -32,11 +32,7 @@ namespace fkpm {
     template EnergyScale energy_scale(SpMatBsr<cx_float> const& H, double extra, double tolerance);
     template EnergyScale energy_scale(SpMatBsr<cx_double> const& H, double extra, double tolerance);
     
-    EnergyScale energy_scale(double low_input, double high_input) {
-        return {low_input, high_input};
-    }
-    
-    Vec<double> jackson_kernel(int M) {  // probably later merge to "set_kernel"?
+    Vec<double> jackson_kernel(int M) {
         auto ret = Vec<double>(M);
         double Mp = M+1.0;
         for (int m = 0; m < M; m++) {
@@ -45,18 +41,10 @@ namespace fkpm {
         return ret;
     }
     
-    Vec<double> set_kernel(int M, std::string kernel_name, double lambda) {
-        assert(kernel_name == "Jackson" || kernel_name == "Lorentz");
+    Vec<double> lorentz_kernel(int M, double lambda) {
         auto ret = Vec<double>(M);
-        if (kernel_name == "Jackson") {
-            double Mp = M+1.0;
-            for (int m = 0; m < M; m++) {
-                ret[m] = (1.0/Mp)*((Mp-m)*cos(Pi*m/Mp) + sin(Pi*m/Mp)/tan(Pi/Mp));
-            }
-        } else {
-            for (int m = 0; m < M; m++) {
-                ret[m] = sinh(lambda * (1.0 - ((double) m)/ M)) / sinh(lambda);
-            }
+        for (int m = 0; m < M; m++) {
+            ret[m] = sinh(lambda * (1.0 - ((double) m)/ M)) / sinh(lambda);
         }
         return ret;
     }
@@ -93,78 +81,61 @@ namespace fkpm {
     }
     
     // notice: for x_i which is too close to -1 or 1, f(x) may be ill defined
-    //         and thus causing numerical errors, so we should remove a few points
-    //         near -1 & 1
-    Vec<Vec<double>> expansion_coef_conductivity(int M, int Mq, std::function<double(double)> f, EnergyScale es,
-                                                  double omega0, Vec<double>& kernel) {
+    //         and thus causing numerical errors, so we should remove a few points near -1 & 1
+    Vec<Vec<cx_double>> electrical_conductivity_coefficients(int M, int Mq, double kT, double mu,
+                                                             double omega, EnergyScale es, Vec<double> const& kernel) {
         // TODO: replace with fftw
-        assert(omega0 >= 0.0);
-        int n_neglect = 5;                 // neglect points near the boundary
-        double omega = omega0 / es.mag();  // rescale omega
-        Vec<Vec<double>> ret(M);
+        assert(kernel.size() == M);
+        assert(omega >= 0.0);
+        int n_neglect = 5;                              // neglect points near the boundary
+        double omega_scaled = omega / es.mag();         // rescale omega
+        Vec<Vec<cx_double>> ret(M);
         for (int i = 0; i < M; i++) {                   // initialize mu to 0
             ret[i].resize(M, 0.0);
         }
-        if (omega >= 2.0 ) return ret;
-        
+        if (omega_scaled >= 2.0 ) return ret;
+        int i_start = (omega_scaled > 1e-7) ? std::ceil(acos(1.0 - omega_scaled) / Pi * Mq - 0.5) : n_neglect;
+        if (i_start < n_neglect) std::cout << "Warning: Need larger Mq!" << std::endl;
         auto T_i = Vec<double>(M);
         auto T_j = Vec<double>(M);
-        int i_start  = ceil(acos(1.0 - omega) / Pi * Mq - 0.5);
-        if (i_start < n_neglect) std::cout << "Warning: Need larger Mq!" << std::endl;
+        
         for (int i = i_start; i < Mq - n_neglect; i++) {
             double x_i = cos(Pi * (i+0.5) / Mq);
-            chebyshev_fill_array(x_i + omega, T_i);
-            chebyshev_fill_array(x_i, T_j);
-            double f_i = f(es.unscale(x_i));
-            for (int m1 = 0; m1 < M; m1++) {
-                for (int m2 = 0; m2 < M; m2++) {
-                    ret[m1][m2] += T_i[m1] * T_j[m2] * f_i / sqrt(1.0 - (x_i + omega) * (x_i + omega)) / Pi;
+            double temp_squareroot1 = std::sqrt(1.0-x_i*x_i);
+            double temp_squareroot2 = std::sqrt(1.0 - (x_i + omega_scaled) * (x_i + omega_scaled));
+            double f_i;
+            if (omega_scaled > 1e-7) {
+                chebyshev_fill_array(x_i + omega_scaled, T_i);
+                chebyshev_fill_array(x_i, T_j);           // fill T_j with cos[m * arccos(x)]
+                f_i = (fermi_density(es.unscale(x_i), kT, mu) - fermi_density(es.unscale(x_i) + omega, kT, mu))
+                     / (omega * temp_squareroot2);
+                for (int m1 = 0; m1 < M; m1++) {
+                    for (int m2 = 0; m2 < M; m2++) {
+                        ret[m1][m2] += T_i[m1] * T_j[m2] * f_i;
+                    }
+                }
+            } else {
+                chebyshev_fill_array(x_i, T_i);
+                chebyshev_fill_array(x_i, T_j, 2);        // fill T_j with sin[m * arccos(x)]
+                for (int m = M-1; m > 0; m--) {
+                    T_j[m] = T_j[m-1] * temp_squareroot1;
+                }
+                T_j[0] = 0.0;
+                f_i = -fermi_density(es.unscale(x_i), kT, mu) / std::pow(1.0-x_i*x_i, 1.5); // explicit convert
+                for (int m1 = 0; m1 < M; m1++) {
+                    for (int m2 = 0; m2 < M; m2++) {
+                        ret[m1][m2] += ( T_i[m1] * cx_double(T_i[m2],-T_j[m2])
+                                        * cx_double(x_i, m2 * temp_squareroot1)
+                                        +T_i[m2] * cx_double(T_i[m1], T_j[m1])
+                                        * cx_double(x_i,-m1 * temp_squareroot1) ) * f_i;
+                    }
                 }
             }
         }
-        if (kernel.size() != M) kernel = set_kernel(M);
         for (int m1 = 0; m1 < M; m1++) {
             for (int m2 = 0; m2 < M; m2++) {
-                ret[m1][m2] *= (m1 == 0 ? 1.0 : 2.0) * (m2 ==0 ? 1.0 : 2.0)
-                              * kernel[m1] * kernel[m2] / Mq;
-            }
-        }
-        return ret;
-    }
-    
-    Vec<Vec<cx_double>> expansion_coef_conductivity(int M, int Mq, std::function<double(double)> f, EnergyScale es, Vec<double>& kernel) {
-        int n_neglect = 5;                 // neglect points near the boundary
-        Vec<Vec<cx_double>> ret(M);
-        for (int i = 0; i < M; i++) {                   // initialize mu to 0
-            ret[i].resize(M, cx_double(0.0,0.0));
-        }
-        
-        auto T_i = Vec<double>(M);
-        auto U_i = Vec<double>(M);        // sin[m * arccos(x)], doesn't exactly mean the definition of U_m(x)
-        for (int i = n_neglect; i < Mq - n_neglect; i++) {
-            double x_i = cos(Pi * (i+0.5) / Mq);
-            chebyshev_fill_array(x_i, T_i);
-            chebyshev_fill_array(x_i, U_i, 2);
-            double temp_squareroot = std::sqrt(1.0-x_i*x_i);
-            for (int m = M-1; m > 0; m--) {
-                U_i[m] = U_i[m-1] * temp_squareroot;
-            }
-            U_i[0] = 0.0;
-            cx_double f_i = f(es.unscale(x_i)) / std::pow(1.0-x_i*x_i, 1.5); // explicit convert
-            for (int m1 = 0; m1 < M; m1++) {
-                for (int m2 = 0; m2 < M; m2++) {
-                    ret[m1][m2] += ( T_i[m1] * cx_double(T_i[m2],-U_i[m2])
-                                             * cx_double(x_i, m2 * temp_squareroot)
-                                    +T_i[m2] * cx_double(T_i[m1], U_i[m1])
-                                             * cx_double(x_i,-m1 * temp_squareroot) ) * f_i;
-                }
-            }
-        }
-        if (kernel.size() != M) kernel = set_kernel(M);
-        for (int m1 = 0; m1 < M; m1++) {
-            for (int m2 = 0; m2 < M; m2++) {
-                ret[m1][m2] *= cx_double((m1 == 0 ? 1.0 : 2.0) * (m2 ==0 ? 1.0 : 2.0)
-                                        * kernel[m1] * kernel[m2] / Mq, 0.0);
+                ret[m1][m2] *= cx_double((m1 == 0 ? 1.0 : 2.0) * (m2 == 0 ? 1.0 : 2.0)
+                                         * kernel[m1] * kernel[m2] / Mq, 0.0);
             }
         }
         return ret;
@@ -192,7 +163,7 @@ namespace fkpm {
         return gamma;
     }
     
-    Vec<Vec<cx_double>> moment_transform(Vec<Vec<cx_double>> const& moments, int Mq, Vec<double>& kernel) {
+    Vec<Vec<cx_double>> moment_transform(Vec<Vec<cx_double>> const& moments, int Mq, Vec<double> const& kernel) {
         int M = moments.size();
         auto T_i = Vec<double>(M);
         auto T_j = Vec<double>(M);
@@ -201,7 +172,6 @@ namespace fkpm {
         for (int i = 0; i < M; i++)  mup[i].resize(M, cx_double(0.0,0.0));
         for (int i = 0; i < Mq; i++) gamma[i].resize(Mq, cx_double(0.0,0.0));
         
-        if (kernel.size() != M) kernel = set_kernel(M);
         for (int m1 = 0; m1 < M; m1++) {
             for (int m2 = 0; m2 < M; m2++) {
                 mup[m1][m2] = cx_double((m1 == 0 ? 1.0 : 2.0) * (m2 == 0 ? 1.0 : 2.0)
@@ -235,9 +205,7 @@ namespace fkpm {
         return ret;
     }
 
-    // need further think about type
-    template <typename T>
-    cx_double moment_product(Vec<Vec<T>> const& c, Vec<Vec<cx_double>> const& mu) {
+    cx_double moment_product(Vec<Vec<cx_double>> const& c, Vec<Vec<cx_double>> const& mu) {
         int M1 = c.size();
         int M2 = c[0].size();
         assert(mu.size() == M1);
@@ -250,8 +218,6 @@ namespace fkpm {
         }
         return ret;
     }
-    template cx_double moment_product(Vec<Vec<double>> const& c, Vec<Vec<cx_double>> const& mu);
-    template cx_double moment_product(Vec<Vec<cx_double>> const& c, Vec<Vec<cx_double>> const& mu);
     
     double density_product(Vec<double> const& gamma, std::function<double(double)> f, EnergyScale es) {
         int Mq = gamma.size();
@@ -274,7 +240,7 @@ namespace fkpm {
         }
     }
     
-    void density_function(Vec<Vec<cx_double>> const& gamma, EnergyScale es, Vec<double>& x, Vec<double>& y, Vec<Vec<double>>& rho) {
+    void density_function(Vec<Vec<cx_double>> const& gamma, EnergyScale es, Vec<double>& x, Vec<double>& y, Vec<Vec<cx_double>>& rho) {
         int Mq1 = gamma.size();
         int Mq2 = gamma[0].size();
         x.resize(Mq1);
@@ -295,9 +261,8 @@ namespace fkpm {
             x[Mq1-1-i1] = es.unscale(x1);
             for (int i2 = Mq2-1; i2 >= 0; i2--) {
                 double x2 = cos(Pi * (i2+0.5) / Mq2);
-                rho[Mq1-1-i1][Mq2-1-i2] = std::real(gamma[i1][i2]) / (Pi * sqrt(1.0 - x1*x1)
-                                                                    * Pi * sqrt(1.0 - x2*x2)
-                                                                    * es.mag() * es.mag());
+                rho[Mq1-1-i1][Mq2-1-i2] = gamma[i1][i2] / (Pi * sqrt(1.0 - x1*x1)
+                                                          * Pi * sqrt(1.0 - x2*x2) * es.mag() * es.mag());
             }
         }
     }
@@ -416,11 +381,4 @@ namespace fkpm {
         }
     }
     
-    double integrand_Conductivity(double x, double omega, double kT, double mu) {
-        if (std::abs(omega) > 1e-10) {
-            return (fermi_density(x, kT, mu) - fermi_density(x + omega, kT, mu)) * Pi / omega;
-        } else {
-            return -fermi_density(x, kT, mu);
-        }
-    }
 }

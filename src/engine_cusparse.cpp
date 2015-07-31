@@ -378,14 +378,14 @@ namespace fkpm {
         
         // this function used to transfer num_schunk columns of R from host to device
         // no transpose needed, since typically num_schunk = 1
-        void transfer_Rchunk(int col, int num_schunk, CuVec<T>& Rchunk_d) {
+        void transfer_Rchunk(int j_start, int num_cols, CuVec<T>& Rchunk_d) {
             TRY(cudaSetDevice(device));
-            assert(col >= 0 && num_schunk > 0 && col < this->R.n_cols);
+            assert(j_start >= 0 && num_cols > 0 && j_start < this->R.n_cols);
             int n               = this->R.n_rows;
-            int num_schunk_used = (col + num_schunk <= this->R.n_cols) ? num_schunk : this->R.n_cols-col;
+            int num_schunk_used = (j_start + num_cols <= this->R.n_cols) ? num_cols : this->R.n_cols-j_start;
             int sz              = n * num_schunk_used;
             Rchunk_d.resize(sz);
-            Rchunk_d.from_host(sz, this->R.colptr(col));      // Rchunk_d = R(:,col:col+num_schunk_used-1)
+            Rchunk_d.from_host(sz, this->R.colptr(j_start));      // Rchunk_d = R(:,col:col+num_schunk_used-1)
         }
         
         void set_H(SpMatBsr<T> const& H, EnergyScale const& es) {
