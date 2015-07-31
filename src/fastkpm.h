@@ -180,13 +180,13 @@ namespace fkpm {
         arma::Mat<T> R;        // Random vectors
         
         // Uncorrelated random elements
-        void set_R_uncorrelated(int n, int s, RNG& rng);
+        void set_R_uncorrelated(int n, int s, RNG& rng, int j_start = -1, int j_end = -1);
         
         // Correlated random elements with mostly orthogonal rows
-        void set_R_correlated(Vec<int> const& groups, RNG& rng, int j_start = 0, int j_end = 0);
+        void set_R_correlated(Vec<int> const& groups, RNG& rng, int j_start = -1, int j_end = -1);
         
         // Identity matrix
-        void set_R_identity(int n, int j_start = 0, int j_end = 0);
+        void set_R_identity(int n, int j_start = -1, int j_end = -1);
         
         // Transfer R matrix to device
         virtual void transfer_R() {}

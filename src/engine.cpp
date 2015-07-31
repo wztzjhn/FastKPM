@@ -32,12 +32,17 @@ namespace fkpm {
     cx_float random_phase(RNG& rng) { return cx_float(random_phase<cx_double>(rng)); }
     
     template <typename T>
-    void Engine<T>::set_R_uncorrelated(int n, int s, RNG& rng) {
-        R.set_size(n, s);
+    void Engine<T>::set_R_uncorrelated(int n, int s, RNG& rng, int j_start, int j_end) {
+        if (j_start < 0) j_start = 0;
+        if (j_end < 0) j_end = s;
+        assert (0 <= j_start && j_start < j_end && j_end <= s);
+        
+        R.set_size(n, j_end-j_start);
         T x = 1.0 / sqrt(s);
-        for (int i = 0; i < n; i++) {
-            for (int j = 0; j < s; j++) {
-                R(i, j) = random_phase<T>(rng) * x;
+        for (int j = j_start; j < j_end; j++) {
+            RNG rng_j(rng()); // new RNG sequence for each column j
+            for (int i = 0; i < n; i++) {
+                R(i, j-j_start) = random_phase<T>(rng_j) * x;
             }
         }
         transfer_R();
@@ -48,18 +53,18 @@ namespace fkpm {
         auto minmax = std::minmax_element(groups.begin(), groups.end());
         assert(*minmax.first == 0);
         assert(*minmax.second >= 0);
+        int s = *minmax.second + 1; // number of columns in full R matrix
         
-        if (j_start <= 0) j_start = 0;
-        if (j_end <= 0) j_end = *minmax.second + 1;
-        assert (j_start < j_end);
+        if (j_start < 0) j_start = 0;
+        if (j_end < 0) j_end = s;
+        assert (0 <= j_start && j_start < j_end && j_end <= s);
         
         int n = groups.size();
-        int s = j_end - j_start;
-        if (s > n) {
+        if (j_end > n) {
             std::cerr << "Inefficiency warning: Using more random vectors than matrix rows!\n";
         }
         
-        R.set_size(n, s);
+        R.set_size(n, j_end-j_start);
         R.fill(0.0);
         for (int j = j_start; j < j_end; j++) {
             RNG rng_j(rng()); // new RNG sequence for each column j
@@ -74,8 +79,8 @@ namespace fkpm {
     
     template <typename T>
     void Engine<T>::set_R_identity(int n, int j_start, int j_end) {
-        if (j_start <= 0) j_start = 0;
-        if (j_end <= 0) j_end = n;
+        if (j_start < 0) j_start = 0;
+        if (j_end < 0) j_end = n;
         assert (0 <= j_start && j_start < j_end && j_end <= n);
         
         R.set_size(n, j_end-j_start);
