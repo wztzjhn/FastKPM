@@ -32,11 +32,24 @@ namespace fkpm {
     cx_float random_phase(RNG& rng) { return cx_float(random_phase<cx_double>(rng)); }
     
     template <typename T>
-    void Engine<T>::set_R_uncorrelated(int n, int s, RNG& rng, int j_start, int j_end) {
-        if (j_start < 0) j_start = 0;
-        if (j_end < 0) j_end = s;
-        assert (0 <= j_start && j_start < j_end && j_end <= s);
+    void Engine<T>::set_R_identity(int n, int j_start, int j_end) {
+        assert (0 <= j_start && j_start <= j_end && j_end <= n);
         
+        R.set_size(n, j_end-j_start);
+        R.fill(0.0);
+        for (int j = j_start; j < j_end; j++) {
+            R(j, j-j_start) = 1.0;
+        }
+        transfer_R();
+    }
+    template <typename T>
+    void Engine<T>::set_R_identity(int n) {
+        set_R_identity(n, 0, n);
+    }
+    
+    template <typename T>
+    void Engine<T>::set_R_uncorrelated(int n, int s, RNG& rng, int j_start, int j_end) {
+        assert (0 <= j_start && j_start <= j_end && j_end <= s);
         R.set_size(n, j_end-j_start);
         T x = 1.0 / sqrt(s);
         for (int j = j_start; j < j_end; j++) {
@@ -47,23 +60,15 @@ namespace fkpm {
         }
         transfer_R();
     }
+    template <typename T>
+    void Engine<T>::set_R_uncorrelated(int n, int s, RNG& rng) {
+        set_R_uncorrelated(n, s, rng, 0, s);
+    }
     
     template <typename T>
     void Engine<T>::set_R_correlated(Vec<int> const& groups, RNG& rng, int j_start, int j_end) {
-        auto minmax = std::minmax_element(groups.begin(), groups.end());
-        assert(*minmax.first == 0);
-        assert(*minmax.second >= 0);
-        int s = *minmax.second + 1; // number of columns in full R matrix
-        
-        if (j_start < 0) j_start = 0;
-        if (j_end < 0) j_end = s;
-        assert (0 <= j_start && j_start < j_end && j_end <= s);
-        
         int n = groups.size();
-        if (j_end > n) {
-            std::cerr << "Inefficiency warning: Using more random vectors than matrix rows!\n";
-        }
-        
+        assert (0 <= j_start && j_start <= j_end && j_end <= n);
         R.set_size(n, j_end-j_start);
         R.fill(0.0);
         for (int j = j_start; j < j_end; j++) {
@@ -76,21 +81,20 @@ namespace fkpm {
         }
         transfer_R();
     }
-    
     template <typename T>
-    void Engine<T>::set_R_identity(int n, int j_start, int j_end) {
-        if (j_start < 0) j_start = 0;
-        if (j_end < 0) j_end = n;
-        assert (0 <= j_start && j_start < j_end && j_end <= n);
-        
-        R.set_size(n, j_end-j_start);
-        R.fill(0.0);
-        for (int j = j_start; j < j_end; j++) {
-            R(j, j-j_start) = 1.0;
+    void Engine<T>::set_R_correlated(Vec<int> const& groups, RNG& rng) {
+        auto minmax = std::minmax_element(groups.begin(), groups.end());
+        assert(*minmax.first == 0);
+        assert(*minmax.second >= 0);
+        int n = groups.size();
+        int s = *minmax.second + 1; // number of columns in full R matrix
+        if (s < n) {
+            set_R_correlated(groups, rng, 0, s);
         }
-        transfer_R();
+        else {
+            set_R_identity(n, 0, n);
+        }
     }
-    
     
     template class Engine<float>;
     template class Engine<double>;

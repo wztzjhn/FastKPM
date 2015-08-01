@@ -5,10 +5,7 @@ set(FASTKPM_VERSION 0.1.0)
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake_modules)
 
 
-# -- OPTIONS -------------------------------------------
-
-# MPI SUPPORT
-set(WITH_MPI no CACHE BOOL "Build with MPI support")
+# -- COMPILE OPTIONS -------------------------------------------
 
 # Installation directories
 set(INSTALL_LIB_DIR lib CACHE PATH "Installation directory for libraries")
@@ -19,9 +16,6 @@ set(INSTALL_CMAKE_DIR lib/CMake/FastKPM CACHE PATH "Installation directory for C
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -g -gdwarf-3")
 add_definitions(-D_GLIBCXX_DEBUG=1) # libstdc++
 add_definitions(-D_LIBCPP_DEBUG2=1) # libc++
-
-
-# -- C++11 -------------------------------------------
 
 # C++11
 include(CheckCXXCompilerFlag)
@@ -44,20 +38,22 @@ endif()
 
 # -- DEPENDENCIES -------------------------------------------
 
-# Armadillo
-find_package(Armadillo 4.400.2 REQUIRED CONFIG
-             PATHS "/usr/local" "$ENV{ARMA_ROOT}" NO_SYSTEM_ENVIRONMENT_PATH)
-include_directories(SYSTEM ${ARMADILLO_INCLUDE_DIRS})
-set(LIBS ${LIBS} ${ARMADILLO_LIBRARIES})
-
-# fftw to be added
-
 # Thread Building Blocks
 find_package(TBB)
 if (TBB_FOUND)
   include_directories(SYSTEM ${TBB_INCLUDE_DIRS})
   set(LIBS ${LIBS} ${TBB_LIBRARIES})
   add_definitions(-DWITH_TBB)
+endif()
+
+# MPI
+find_package(MPI)
+if (MPI_FOUND)
+  include_directories(${MPI_INCLUDE_PATH})
+  set(LIBS ${LIBS} ${MPI_LIBRARIES})
+  set(CMAKE_CXX_FLAGS        "${CMAKE_CXX_FLAGS} ${MPI_COMPILE_FLAGS}")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${MPI_LINK_FLAGS}")
+  add_definitions(-DWITH_MPI)
 endif()
 
 # CUDA
@@ -79,29 +75,19 @@ if (CUDA_FOUND)
   set(CUDA_PROPAGATE_HOST_FLAGS OFF)
 endif()
 
+# Armadillo
+find_package(Armadillo 4.400.2 REQUIRED CONFIG
+             PATHS "/usr/local" "$ENV{ARMA_ROOT}" NO_SYSTEM_ENVIRONMENT_PATH)
+include_directories(SYSTEM ${ARMADILLO_INCLUDE_DIRS})
+set(LIBS ${LIBS} ${ARMADILLO_LIBRARIES})
+
 # Boost
 find_package(Boost 1.55.0 REQUIRED)
 include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 
 
-if (WITH_MPI)
-  # MPI
-  find_package(MPI REQUIRED)
-  include_directories(${MPI_INCLUDE_PATH})
-  set(LIBS ${LIBS} ${MPI_LIBRARIES})
-  set(CMAKE_CXX_FLAGS        "${CMAKE_CXX_FLAGS} ${MPI_COMPILE_FLAGS}")
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${MPI_LINK_FLAGS}")
-  # BOOST MPI
-  set(Boost_USE_MULTITHREADED ON)
-  find_package(Boost REQUIRED COMPONENTS MPI)
-  include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
-  set(LIBS ${LIBS} ${Boost_MPI_LIBRARY})
-endif()
-
-
 # -- BUILD -------------------------------------------
 
-# include_directories(src)
 add_subdirectory(src)
 
 
@@ -144,5 +130,5 @@ message("C++ compiler flags  : ${CMAKE_CXX_FLAGS}")
 get_property(INC_DIRS DIRECTORY PROPERTY INCLUDE_DIRECTORIES)
 message("LIBS:     ${LIBS}")
 message("INCLUDES: ${INC_DIRS}")
-message("WITH_MPI: ${WITH_MPI}")
+message("WITH_MPI: ${MPI_FOUND}")
 message("")

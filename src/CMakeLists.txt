@@ -4,6 +4,7 @@ set(KPM_SRC
   engine.cpp
   engine_cpu.cpp
   engine_cusparse.cpp
+  engine_mpi.cpp
   timer.cpp
 )
 

@@ -128,7 +128,7 @@ namespace fkpm {
     // Optimally damp Gibbs oscillations in KPM estimates
     Vec<double> jackson_kernel(int M);
     
-    // Damp Gibbs oscillations while preserving complex analytic behavior
+    // Damp Gibbs oscillations while preserving complex analytic behavior of Green's function
     Vec<double> lorentz_kernel(int M, double lambda);
     
     // Chebyshev polynomials evaluated at x, default to be the first kind T_m(x)
@@ -190,14 +190,17 @@ namespace fkpm {
     public:
         arma::Mat<T> R;        // Random vectors
         
+        // Identity matrix
+        virtual void set_R_identity(int n, int j_start, int j_end);
+        virtual void set_R_identity(int n);
+        
         // Uncorrelated random elements
-        void set_R_uncorrelated(int n, int s, RNG& rng, int j_start = -1, int j_end = -1);
+        virtual void set_R_uncorrelated(int n, int s, RNG& rng, int j_start, int j_end);
+        virtual void set_R_uncorrelated(int n, int s, RNG& rng);
         
         // Correlated random elements with mostly orthogonal rows
-        void set_R_correlated(Vec<int> const& groups, RNG& rng, int j_start = -1, int j_end = -1);
-        
-        // Identity matrix
-        void set_R_identity(int n, int j_start = -1, int j_end = -1);
+        virtual void set_R_correlated(Vec<int> const& groups, RNG& rng, int j_start, int j_end);
+        virtual void set_R_correlated(Vec<int> const& groups, RNG& rng);
         
         // Transfer R matrix to device
         virtual void transfer_R() {}
@@ -232,6 +235,10 @@ namespace fkpm {
     // CuSPARSE engine
     template <typename T>
     std::shared_ptr<Engine<T>> mk_engine_cuSPARSE(int device);
+    
+    // MPI engine
+    template <typename T>
+    std::shared_ptr<Engine<T>> mk_engine_mpi();
     
     // Fastest engine available
     template <typename T>
