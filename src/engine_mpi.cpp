@@ -15,6 +15,13 @@ namespace fkpm {
 
 #else
 
+// workaround missing "is_trivially_copyable" in g++ < 5.0
+#if __GNUG__ && __GNUC__ < 5
+#define IS_TRIVIALLY_COPYABLE(T) __has_trivial_copy(T)
+#else
+#define IS_TRIVIALLY_COPYABLE(T) std::is_trivially_copyable<T>::value
+#endif
+
 #include <mpi.h>
 #include <cassert>
 #include <cstdint>
@@ -37,7 +44,7 @@ namespace fkpm {
             buffer.insert(buffer.end(), data, data+size);
         }
         
-        template <typename T, class=typename std::enable_if<std::is_trivially_copyable<T>::value>::type>
+        template <typename T, class=typename std::enable_if<IS_TRIVIALLY_COPYABLE(T)>::type>
         Serializer& operator<< (T const& x) {
             write_bytes((uint8_t *)&x, sizeof(T));
             return *this;
@@ -46,7 +53,7 @@ namespace fkpm {
         template <typename T>
         Serializer& operator<< (Vec<T> const& x) {
             *this << x.size();
-            if (std::is_trivially_copyable<T>::value) {
+            if (IS_TRIVIALLY_COPYABLE(T)) {
                 write_bytes((uint8_t *)x.data(), x.size()*sizeof(T));
             }
             else {
@@ -84,7 +91,7 @@ namespace fkpm {
             pos += size;
         }
         
-        template <typename T, class=typename std::enable_if<std::is_trivially_copyable<T>::value>::type>
+        template <typename T, class=typename std::enable_if<IS_TRIVIALLY_COPYABLE(T)>::type>
         Deserializer& operator>> (T& x) {
             read_bytes((uint8_t *)&x, sizeof(T));
             return *this;
@@ -94,7 +101,7 @@ namespace fkpm {
         Deserializer& operator>> (Vec<T>& x) {
             size_t size; *this >> size;
             x.resize(size);
-            if (std::is_trivially_copyable<T>::value) {
+            if (IS_TRIVIALLY_COPYABLE(T)) {
                 read_bytes((uint8_t *)x.data(), x.size()*sizeof(T));
             }
             else {
