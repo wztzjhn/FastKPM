@@ -108,7 +108,7 @@ namespace fkpm {
                 chebyshev_fill_array(x_i + omega_scaled, T_i);
                 chebyshev_fill_array(x_i, T_j);           // fill T_j with cos[m * arccos(x)]
                 f_i = (fermi_density(es.unscale(x_i), kT, mu) - fermi_density(es.unscale(x_i) + omega, kT, mu))
-                     / (omega * temp_squareroot2);
+                     / (omega * temp_squareroot2) / (es.mag() * es.mag());
                 for (int m1 = 0; m1 < M; m1++) {
                     for (int m2 = 0; m2 < M; m2++) {
                         ret[m1][m2] += T_i[m1] * T_j[m2] * f_i;
@@ -121,7 +121,8 @@ namespace fkpm {
                     T_j[m] = T_j[m-1] * temp_squareroot1;
                 }
                 T_j[0] = 0.0;
-                f_i = -fermi_density(es.unscale(x_i), kT, mu) / std::pow(1.0-x_i*x_i, 1.5); // explicit convert
+                f_i = fermi_density(es.unscale(x_i), kT, mu) / std::pow(1.0-x_i*x_i, 1.5)
+                     / (es.mag() * es.mag()) ; // explicit convert
                 for (int m1 = 0; m1 < M; m1++) {
                     for (int m2 = 0; m2 < M; m2++) {
                         ret[m1][m2] += ( T_i[m1] * cx_double(T_i[m2],-T_j[m2])
