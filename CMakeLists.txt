@@ -93,30 +93,30 @@ add_subdirectory(src)
 
 # -- INSTALLATION -------------------------------------------
 
-# Generate FastKPMTargets.cmake suitable for use by downstreams
-export(TARGETS fastkpm FILE "${PROJECT_BINARY_DIR}/FastKPMTargets.cmake")
+# Generate fastkpmTargets.cmake suitable for use by downstreams
+export(TARGETS fastkpm FILE "${PROJECT_BINARY_DIR}/fastkpmTargets.cmake")
 
 # Register the build-tree with a global CMake-registry
 export(PACKAGE fastkpm)
 
-# Create the FastKPMConfig.cmake and FastKPMConfigVersion files
+# Create the fastkpmConfig.cmake and fastkpmConfigVersion files
 # ... for the build tree
 set(CONF_INCLUDE_DIRS "${PROJECT_SOURCE_DIR}/src")
-configure_file(FastKPMConfig.cmake.in "${PROJECT_BINARY_DIR}/FastKPMConfig.cmake" @ONLY)
+configure_file(fastkpmConfig.cmake.in "${PROJECT_BINARY_DIR}/fastkpmConfig.cmake" @ONLY)
 # ... for the install tree
 set(CONF_INCLUDE_DIRS "${INSTALL_INCLUDE_DIR}")
-configure_file(FastKPMConfig.cmake.in "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/FastKPMConfig.cmake" @ONLY)
+configure_file(fastkpmConfig.cmake.in "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/fastkpmConfig.cmake" @ONLY)
 # ... for both
-configure_file(FastKPMConfigVersion.cmake.in "${PROJECT_BINARY_DIR}/FastKPMConfigVersion.cmake" @ONLY)
+configure_file(fastkpmConfigVersion.cmake.in "${PROJECT_BINARY_DIR}/fastkpmConfigVersion.cmake" @ONLY)
 
-# Install FastKPMConfig.cmake and FastKPMConfigVersion.cmake
+# Install fastkpmConfig.cmake and fastkpmConfigVersion.cmake
 install(FILES
-  "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/FastKPMConfig.cmake"
-  "${PROJECT_BINARY_DIR}/FastKPMConfigVersion.cmake"
+  "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/fastkpmConfig.cmake"
+  "${PROJECT_BINARY_DIR}/fastkpmConfigVersion.cmake"
   DESTINATION "${INSTALL_CMAKE_DIR}" COMPONENT dev)
  
-# Install FastKPMTargets.cmake
-install(EXPORT FastKPMTargets DESTINATION "${INSTALL_CMAKE_DIR}" COMPONENT dev)
+# Install fastkpmTargets.cmake
+install(EXPORT fastkpmTargets DESTINATION "${INSTALL_CMAKE_DIR}" COMPONENT dev)
 
 
 # -- REPORT -------------------------------------------
