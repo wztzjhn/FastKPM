@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8)
 
-project(FastKPM)
+project(fastkpm)
 set(FASTKPM_VERSION 0.1.0)
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake_modules)
 
@@ -10,7 +10,7 @@ set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake_modules)
 # Installation directories
 set(INSTALL_LIB_DIR lib CACHE PATH "Installation directory for libraries")
 set(INSTALL_INCLUDE_DIR include CACHE PATH "Installation directory for header files")
-set(INSTALL_CMAKE_DIR lib/CMake/FastKPM CACHE PATH "Installation directory for CMake files")
+set(INSTALL_CMAKE_DIR lib/CMake/fastkpm CACHE PATH "Installation directory for CMake files")
 
 # Performance/debug options
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -g -gdwarf-3")
@@ -93,11 +93,11 @@ add_subdirectory(src)
 
 # -- INSTALLATION -------------------------------------------
 
-# Generate FastKPMTargets.cmake suitable for use by downstreams 
+# Generate FastKPMTargets.cmake suitable for use by downstreams
 export(TARGETS fastkpm FILE "${PROJECT_BINARY_DIR}/FastKPMTargets.cmake")
 
 # Register the build-tree with a global CMake-registry
-export(PACKAGE FastKPM)
+export(PACKAGE fastkpm)
 
 # Create the FastKPMConfig.cmake and FastKPMConfigVersion files
 # ... for the build tree
