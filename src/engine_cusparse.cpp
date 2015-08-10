@@ -783,11 +783,18 @@ namespace fkpm {
             return mus[0];
         }
         
-        Vec<Vec<cx_double>> moments_tensor(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op, int a_chunk_ncols=-1) {
+        Vec<Vec<cx_double>> moments2_v1(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op, int a_chunk_ncols=-1) {
             if (n_threads > 1) {
-                std::cerr << "Threaded moments_tensor not yet implemented!\n";
+                std::cerr << "Threaded moments2_v1 not yet implemented!\n";
             }
-            return workers[0]->moments_tensor(M, j1op, j2op, a_chunk_ncols);
+            return workers[0]->moments2_v1(M, j1op, j2op, a_chunk_ncols);
+        }
+        
+        Vec<Vec<cx_double>> moments2_v2(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op, int a_chunk_ncols=-1) {
+            if (n_threads > 1) {
+                std::cerr << "Threaded moments2_v2 not yet implemented!\n";
+            }
+            return workers[0]->moments2_v2(M, j1op, j2op, a_chunk_ncols);
         }
         
         void stoch_matrix(Vec<double> const& c, SpMatBsr<T>& D) {

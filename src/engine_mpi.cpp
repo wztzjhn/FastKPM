@@ -145,7 +145,8 @@ namespace fkpm {
             &Engine_MPI::exec_set_R_correlated,
             &Engine_MPI::exec_set_H,
             &Engine_MPI::exec_moments,
-            &Engine_MPI::exec_moments_tensor,
+            &Engine_MPI::exec_moments2_v1,
+            &Engine_MPI::exec_moments2_v2,
             &Engine_MPI::exec_stoch_matrix,
             &Engine_MPI::exec_autodiff_matrix,
         };
@@ -156,7 +157,8 @@ namespace fkpm {
             tag_set_R_correlated,
             tag_set_H,
             tag_moments,
-            tag_moments_tensor,
+            tag_moments2_v1,
+            tag_moments2_v2,
             tag_stoch_matrix,
             tag_autodiff_matrix,
             tag_quit,
@@ -290,18 +292,33 @@ namespace fkpm {
             return des.take<Vec<double>>();
         }
         
-        void exec_moments_tensor() {
+        void exec_moments2_v1() {
             int M, a_chunk_ncols;
             SpMatBsr<T> j1op, j2op;
             des >> M >> j1op >> j2op >> a_chunk_ncols;
-            Vec<Vec<cx_double>> mu = worker->moments_tensor(M, j1op, j2op, a_chunk_ncols);
+            Vec<Vec<cx_double>> mu = worker->moments2_v1(M, j1op, j2op, a_chunk_ncols);
             assert(false && "Convert mu to matrix and implement reduce-sum");
             ser << mu;
         }
-        Vec<Vec<cx_double>> moments_tensor(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op, int a_chunk_ncols=-1) {
+        Vec<Vec<cx_double>> moments2_v1(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op, int a_chunk_ncols=-1) {
             ser.buffer.clear();
             ser << M << j1op << j2op << a_chunk_ncols;
-            broadcast_cmd(tag_moments_tensor);
+            broadcast_cmd(tag_moments2_v1);
+            return des.take<Vec<Vec<cx_double>>>();
+        }
+        
+        void exec_moments2_v2() {
+            int M, a_chunk_ncols;
+            SpMatBsr<T> j1op, j2op;
+            des >> M >> j1op >> j2op >> a_chunk_ncols;
+            Vec<Vec<cx_double>> mu = worker->moments2_v2(M, j1op, j2op, a_chunk_ncols);
+            assert(false && "Convert mu to matrix and implement reduce-sum");
+            ser << mu;
+        }
+        Vec<Vec<cx_double>> moments2_v2(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op, int a_chunk_ncols=-1) {
+            ser.buffer.clear();
+            ser << M << j1op << j2op << a_chunk_ncols;
+            broadcast_cmd(tag_moments2_v2);
             return des.take<Vec<Vec<cx_double>>>();
         }
         
