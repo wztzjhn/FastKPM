@@ -140,10 +140,12 @@ namespace fkpm {
             B[0] = j1 * this->R;
             B[1] = Hs * B[0];
             for (int i = 2; i < M; i++) {
-                A[i] = 2.0 * Hs * A[i-1] - A[i-2];
-                B[i] = 2.0 * Hs * B[i-1] - B[i-2];
+                A[i]   = 2.0 * Hs * A[i-1] - A[i-2];
+                B[i]   = 2.0 * Hs * B[i-1] - B[i-2];
+                A[i-2] = arma::trans(this->R)  * A[i-2];
+                B[i-2] = arma::trans(this->R2) * B[i-2];
             }
-            for (int i = 0; i < M; i++) {
+            for (int i = M-2; i < M; i++) {
                 A[i] = arma::trans(this->R)  * A[i];
                 B[i] = arma::trans(this->R2) * B[i];
             }
