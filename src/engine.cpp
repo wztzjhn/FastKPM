@@ -139,7 +139,7 @@ namespace fkpm {
     template <typename T>
     std::shared_ptr<Engine<T>> mk_engine() {
         std::shared_ptr<Engine<T>> ret;
-        ret = mk_engine_cuSPARSE<T>(0);
+        ret = mk_engine_cuSPARSE<T>();
         if (ret == nullptr)
             ret = mk_engine_cpu<T>();
         return ret;

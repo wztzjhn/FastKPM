@@ -243,15 +243,15 @@ namespace fkpm {
     
     // CuSPARSE engine
     template <typename T>
-    std::shared_ptr<Engine<T>> mk_engine_cuSPARSE(int device);
+    std::shared_ptr<Engine<T>> mk_engine_cuSPARSE(Vec<int> devices = {});
+    
+    // Fastest single-node engine available
+    template <typename T>
+    std::shared_ptr<Engine<T>> mk_engine();
     
     // MPI engine
     template <typename T>
     std::shared_ptr<Engine<T>> mk_engine_mpi();
-    
-    // Fastest engine available
-    template <typename T>
-    std::shared_ptr<Engine<T>> mk_engine();
     
     
     // -- timer.cpp ------------------------------------------------------------------------

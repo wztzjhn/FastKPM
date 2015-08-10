@@ -721,31 +721,135 @@ namespace fkpm {
     };
     
     
-    static Vec<bool> printed_mk_engine_msg(16, false);
     template <typename T>
-    std::shared_ptr<Engine<T>> mk_engine_cuSPARSE(int device) {
+    class Engine_Threaded: public Engine<T> {
+    public:
+        int n_threads;
+        Vec<std::shared_ptr<Engine<T>>> workers;
+        
+        Engine_Threaded(Vec<std::shared_ptr<Engine<T>>> workers):
+            n_threads(workers.size()),
+            workers(workers) {}
+        
+        void set_R_identity(int n, int j_start, int j_end) {
+            parallel_for(0, n_threads, [&](int t) {
+                int sz = j_end - j_start;
+                int j1 = j_start + t * sz / n_threads;
+                int j2 = j_start + (t + 1) * sz / n_threads;
+                workers[t]->set_R_identity(n, j1, j2);
+            });
+        }
+        
+        void set_R_uncorrelated(int n, int s, RNG& rng, int j_start, int j_end) {
+            parallel_for(0, n_threads, [&](int t) {
+                RNG rng0 = rng;
+                int sz = j_end - j_start;
+                int j1 = j_start + t * sz / n_threads;
+                int j2 = j_start + (t + 1) * sz / n_threads;
+                rng0.discard(j1 - j_start);
+                workers[t]->set_R_uncorrelated(n, s, rng0, j1, j2);
+            });
+            rng.discard(j_end - j_start);
+        }
+        
+        void set_R_correlated(Vec<int> const& groups, RNG& rng, int j_start, int j_end) {
+            parallel_for(0, n_threads, [&](int t) {
+                RNG rng0 = rng;
+                int sz = j_end - j_start;
+                int j1 = j_start + t * sz / n_threads;
+                int j2 = j_start + (t + 1) * sz / n_threads;
+                rng0.discard(j1 - j_start);
+                workers[t]->set_R_correlated(groups, rng0, j1, j2);
+            });
+            rng.discard(j_end - j_start);
+        }
+        
+        void set_H(SpMatBsr<T> const& H, EnergyScale const& es) {
+            parallel_for(0, n_threads, [&](int t) {
+                workers[t]->set_H(H, es);
+            });
+        }
+        
+        Vec<double> moments(int M) {
+            Vec<Vec<double>> mus(n_threads);
+            parallel_for(0, n_threads, [&](int t) {
+                mus[t] = workers[t]->moments(M);
+            });
+            for (int t = 1; t < n_threads; t++) {
+                for (int m = 0; m < M; m++) {
+                    mus[0][m] += mus[t][m];
+                }
+            }
+            return mus[0];
+        }
+        
+        Vec<Vec<cx_double>> moments_tensor(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op, int a_chunk_ncols=-1) {
+            if (n_threads > 1) {
+                std::cerr << "Threaded moments_tensor not yet implemented!\n";
+            }
+            return workers[0]->moments_tensor(M, j1op, j2op, a_chunk_ncols);
+        }
+        
+        void stoch_matrix(Vec<double> const& c, SpMatBsr<T>& D) {
+            Vec<SpMatBsr<T>> Ds(n_threads, D);
+            parallel_for(0, n_threads, [&](int t) {
+                workers[t]->stoch_matrix(c, Ds[t]);
+            });
+            D.zeros();
+            for (auto &Dt : Ds) {
+                for (int i = 0; i < D.val.size(); i++) {
+                    D.val[i] += Dt.val[i];
+                }
+            }
+        }
+        
+        void autodiff_matrix(Vec<double> const& c, SpMatBsr<T>& D) {
+            Vec<SpMatBsr<T>> Ds(n_threads, D);
+            parallel_for(0, n_threads, [&](int t) {
+                workers[t]->autodiff_matrix(c, Ds[t]);
+            });
+            D.zeros();
+            for (auto &Dt : Ds) {
+                for (int i = 0; i < D.val.size(); i++) {
+                    D.val[i] += Dt.val[i];
+                }
+            }
+        }
+    };
+    
+    
+    template <typename T>
+    std::shared_ptr<Engine<T>> mk_engine_cuSPARSE(Vec<int> devices) {
+        static bool printed_devices = false;
         std::stringstream msg;
-        assert(device >= 0 && device < printed_mk_engine_msg.size());
+        Vec<std::shared_ptr<Engine<T>>> workers;
         std::shared_ptr<Engine<T>> ret = nullptr;
         int count;
         int err = cudaGetDeviceCount(&count);
         switch (err) {
             case cudaSuccess:
-                if (device < count) {
-                    cudaDeviceProp prop;
-                    cudaGetDeviceProperties(&prop, device);
-                    msg << "Using device #" << device << " (" << count << " devices available)\n";
-                    msg << "  Device name:           " << prop.name << "\n";
-                    msg << "  Total global memory:   " << prop.totalGlobalMem/(1024.*1024.*1024.) << " (GB)\n";
-                    msg << "  Peak memory bandwidth: " << 2.0*prop.memoryClockRate*(prop.memoryBusWidth/8)/1.0e6 << " (GB/s)\n\n";
-                    ret = std::make_shared<Engine_cuSPARSE<T>>(device);
+                if (devices.size() == 0) {
+                    for (int i = 0; i < count; i++) devices.push_back(i);
                 }
-                else {
-                    msg << "Device #" << device << " exceeds availability (" << count << " devices)!\n";
+                for (int d : devices) {
+                    if (d < 0 || count < d) {
+                        std::cerr << "Invalid device #" << d << " (" << count << " available)!\n";
+                        std::exit(EXIT_FAILURE);
+                    }
+                    if (!printed_devices) {
+                        cudaDeviceProp prop;
+                        cudaGetDeviceProperties(&prop, d);
+                        msg << "Device #" << d << " (of " << count << ");  "
+                            << prop.name << ";  "
+                            << prop.totalGlobalMem/(1024.*1024.*1024.) << " GB;  "
+                            << 2.0*prop.memoryClockRate*(prop.memoryBusWidth/8)/1.0e6 << " GB/s\n";
+                    }
+                    workers.push_back(std::make_shared<Engine_cuSPARSE<T>>(d));
                 }
+                ret = std::make_shared<Engine_Threaded<T>>(workers);
                 break;
             case cudaErrorNoDevice:
-                msg << "No CUDA device is available!\n";
+                msg << "No CUDA devices are available!\n";
                 break;
             case cudaErrorInsufficientDriver:
                 msg << "Insufficient CUDA driver!\n";
@@ -754,17 +858,17 @@ namespace fkpm {
                 msg << "Unknown CUDA error " << err << "!\n";
                 break;
         }
-        if (!printed_mk_engine_msg[device]) {
+        if (!printed_devices) {
             std::cout << msg.str();
-            printed_mk_engine_msg[device] = true;
+            printed_devices = true;
         }
         return ret;
     }
     
-    template std::shared_ptr<Engine<float>> mk_engine_cuSPARSE(int device);
-    template std::shared_ptr<Engine<double>> mk_engine_cuSPARSE(int device);
-    template std::shared_ptr<Engine<cx_float>> mk_engine_cuSPARSE(int device);
-    template std::shared_ptr<Engine<cx_double>> mk_engine_cuSPARSE(int device);
+    template std::shared_ptr<Engine<float>> mk_engine_cuSPARSE(Vec<int> devices);
+    template std::shared_ptr<Engine<double>> mk_engine_cuSPARSE(Vec<int> devices);
+    template std::shared_ptr<Engine<cx_float>> mk_engine_cuSPARSE(Vec<int> devices);
+    template std::shared_ptr<Engine<cx_double>> mk_engine_cuSPARSE(Vec<int> devices);
 }
 
 #endif // WITH_CUDA
