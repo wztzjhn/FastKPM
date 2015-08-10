@@ -6,7 +6,7 @@ namespace fkpm {
     template <typename T>
     std::shared_ptr<Engine<T>> mk_engine_mpi() {
         std::cerr << "MPI unavailable. Falling back to single-node KPM engine.\n";
-        return mk_engine();
+        return mk_engine<T>();
     }
     template std::shared_ptr<Engine<float>> mk_engine_mpi();
     template std::shared_ptr<Engine<double>> mk_engine_mpi();
