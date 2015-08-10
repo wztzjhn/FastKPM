@@ -478,7 +478,7 @@ namespace fkpm {
         }
         
         
-        Vec<Vec<cx_double>> moments_tensor(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op, int a_chunk_ncols) {
+        Vec<Vec<cx_double>> moments2_v1(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op, int a_chunk_ncols) {
             int R_chunk_ncols = 1;
             TRY(cudaSetDevice(device));
             
@@ -581,6 +581,11 @@ namespace fkpm {
             for (int i = 0; i < alpha.size(); i++) alpha[i].deallocate();
             for (int i = 0; i < atild.size(); i++) atild[i].deallocate();
             return mu;
+        }
+        
+        Vec<Vec<cx_double>> moments2_v2(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op, int a_chunk_ncols) {
+            Vec<Vec<cx_double>> ret;
+            return ret;
         }
         
         void stoch_matrix(Vec<double> const& c, SpMatBsr<T>& D) {

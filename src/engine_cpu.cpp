@@ -45,7 +45,7 @@ namespace fkpm {
             return mu;
         }
 
-        Vec<Vec<cx_double>> moments_tensor(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op, int a_chunk_ncols) {
+        Vec<Vec<cx_double>> moments2_v1(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op, int a_chunk_ncols) {
             // The columns in the alpha-matrix correspond to alpha vectors of various Chebyshev order.
             // We operate on a single column r in the R matrix at a time.
             // Specifically,
@@ -113,6 +113,52 @@ namespace fkpm {
             alpha.reset();
             atild.reset();
             
+            j1.reset();
+            j2.reset();
+            return mu;
+        }
+        
+        Vec<Vec<cx_double>> moments2_v2(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op, int a_chunk_ncols) {
+            Vec<arma::Mat<T>> A(M), B(M);
+            int n = this->R.n_rows;
+            int s = this->R.n_cols;
+            auto j1 = j1op.to_arma();
+            auto j2 = j2op.to_arma();
+            
+            assert(Hs.n_rows == n && Hs.n_cols == n);
+            assert(j1.n_rows == n && j1.n_cols == n);
+            assert(j2.n_rows == n && j2.n_cols == n);
+            assert(M % 2 == 0);
+            assert(n == this->R2.n_rows && s == this->R2.n_cols);
+            
+            Vec<Vec<cx_double>> mu(M);
+            for (int i = 0; i < M; i++) {
+                mu[i].resize(M, cx_double(0.0, 0.0)); // mu = 0
+            }
+            A[0] = j2 * this->R2;
+            A[1] = Hs * A[0];
+            B[0] = j1 * this->R;
+            B[1] = Hs * B[0];
+            for (int i = 2; i < M; i++) {
+                A[i] = 2.0 * Hs * A[i-1] - A[i-2];
+                B[i] = 2.0 * Hs * B[i-1] - B[i-2];
+            }
+            for (int i = 0; i < M; i++) {
+                A[i] = arma::trans(this->R)  * A[i];
+                B[i] = arma::trans(this->R2) * B[i];
+            }
+            for (int m1 = 0; m1 < M; m1++) {
+                for (int m2 = 0; m2 < M; m2++) {
+                    for (int k = 0; k < s; k++) {
+                        mu[m1][m2] += arma::dot(A[m1].row(k), B[m2].col(k));
+                    }
+                }
+            }
+            
+            for (int i = 0; i < M; i++) {
+                A[i].reset();
+                B[i].reset();
+            }
             j1.reset();
             j2.reset();
             return mu;

@@ -190,14 +190,19 @@ namespace fkpm {
     class Engine {
     public:
         arma::Mat<T> R;        // Random vectors
+        arma::Mat<T> R2;       // Another Random vector for 2nd version of moments calculation
         
         // Identity matrix
         virtual void set_R_identity(int n, int j_start, int j_end);
         virtual void set_R_identity(int n);
+        virtual void set_R2_identity(int n, int j_start, int j_end);
+        virtual void set_R2_identity(int n);
         
         // Uncorrelated random elements
         virtual void set_R_uncorrelated(int n, int s, RNG& rng, int j_start, int j_end);
         virtual void set_R_uncorrelated(int n, int s, RNG& rng);
+        virtual void set_R2_uncorrelated(int n, int s, RNG& rng, int j_start, int j_end);
+        virtual void set_R2_uncorrelated(int n, int s, RNG& rng);
         
         // Correlated random elements with mostly orthogonal rows
         virtual void set_R_correlated(Vec<int> const& groups, RNG& rng, int j_start, int j_end);
@@ -205,6 +210,7 @@ namespace fkpm {
         
         // Transfer R matrix to device
         virtual void transfer_R() {}
+        virtual void transfer_R2() {}
         
         // Set Hamiltonian and energy scale
         virtual void set_H(SpMatBsr<T> const& H, EnergyScale const& es) = 0;
@@ -213,7 +219,9 @@ namespace fkpm {
         virtual Vec<double> moments(int M) = 0;
         
         // Chebyshev moments: mu_{m1,m2} = tr( j1 T_{m1}(Hs) j2 T_{m2}(Hs) )
-        virtual Vec<Vec<cx_double>> moments_tensor(int M, SpMatBsr<T> const& j1op,
+        virtual Vec<Vec<cx_double>> moments2_v1(int M, SpMatBsr<T> const& j1op,
+                                                   SpMatBsr<T> const& j2op, int a_chunk_ncols=-1) = 0;
+        virtual Vec<Vec<cx_double>> moments2_v2(int M, SpMatBsr<T> const& j1op,
                                                    SpMatBsr<T> const& j2op, int a_chunk_ncols=-1) = 0;
         
         // Approximates D ~ (xi R^\dagger + R xi^\dagger)/2 where xi = D R
