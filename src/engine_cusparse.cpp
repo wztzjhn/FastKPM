@@ -584,8 +584,8 @@ namespace fkpm {
         }
         
         Vec<Vec<cx_double>> moments2_v2(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op, int a_chunk_ncols) {
-            Vec<Vec<cx_double>> ret;
-            return ret;
+            std::cerr << "moments2_v2 unimplemented on GPU\n";
+            std::exit(EXIT_FAILURE);
         }
         
         void stoch_matrix(Vec<double> const& c, SpMatBsr<T>& D) {
