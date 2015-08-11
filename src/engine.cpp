@@ -58,13 +58,14 @@ namespace fkpm {
                 R(i, j-j_start) = random_phase<T>(rng_j) * x;
             }
         }
-        R2.set_size(n, j_end-j_start);
-        for (int j = j_start; j < j_end; j++) {
-            RNG rng_j(rng()); // new RNG sequence for each column j
-            for (int i = 0; i < n; i++) {
-                R2(i, j-j_start) = random_phase<T>(rng_j) * x;
-            }
-        }
+//        R2.set_size(n, j_end-j_start);
+//        for (int j = j_start; j < j_end; j++) {
+//            RNG rng_j(rng()); // new RNG sequence for each column j
+//            for (int i = 0; i < n; i++) {
+//                R2(i, j-j_start) = random_phase<T>(rng_j) * x;
+//            }
+//        }
+        R2 = R;
         transfer_R();
     }
     template <typename T>
@@ -86,16 +87,17 @@ namespace fkpm {
                 }
             }
         }
-        R2.set_size(n, j_end-j_start);
-        R2.fill(0.0);
-        for (int j = j_start; j < j_end; j++) {
-            RNG rng_j(rng()); // new RNG sequence for each column j
-            for (int i = 0; i < n; i++) {
-                if (groups[i] == j) {
-                    R2(i, j-j_start) = random_phase<T>(rng_j);
-                }
-            }
-        }
+//        R2.set_size(n, j_end-j_start);
+//        R2.fill(0.0);
+//        for (int j = j_start; j < j_end; j++) {
+//            RNG rng_j(rng()); // new RNG sequence for each column j
+//            for (int i = 0; i < n; i++) {
+//                if (groups[i] == j) {
+//                    R2(i, j-j_start) = random_phase<T>(rng_j);
+//                }
+//            }
+//        }
+        R2 = R;
         transfer_R();
     }
     template <typename T>
