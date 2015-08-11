@@ -824,10 +824,9 @@ namespace fkpm {
         }
     };
     
-    
+    static bool printed_devices = false;
     template <typename T>
     std::shared_ptr<Engine<T>> mk_engine_cuSPARSE(Vec<int> devices) {
-        static bool printed_devices = false;
         std::stringstream msg;
         Vec<std::shared_ptr<Engine<T>>> workers;
         std::shared_ptr<Engine<T>> ret = nullptr;
