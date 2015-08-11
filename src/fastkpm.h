@@ -195,14 +195,10 @@ namespace fkpm {
         // Identity matrix
         virtual void set_R_identity(int n, int j_start, int j_end);
         virtual void set_R_identity(int n);
-        virtual void set_R2_identity(int n, int j_start, int j_end);
-        virtual void set_R2_identity(int n);
         
         // Uncorrelated random elements
         virtual void set_R_uncorrelated(int n, int s, RNG& rng, int j_start, int j_end);
         virtual void set_R_uncorrelated(int n, int s, RNG& rng);
-        virtual void set_R2_uncorrelated(int n, int s, RNG& rng, int j_start, int j_end);
-        virtual void set_R2_uncorrelated(int n, int s, RNG& rng);
         
         // Correlated random elements with mostly orthogonal rows
         virtual void set_R_correlated(Vec<int> const& groups, RNG& rng, int j_start, int j_end);
@@ -210,7 +206,6 @@ namespace fkpm {
         
         // Transfer R matrix to device
         virtual void transfer_R() {}
-        virtual void transfer_R2() {}
         
         // Set Hamiltonian and energy scale
         virtual void set_H(SpMatBsr<T> const& H, EnergyScale const& es) = 0;

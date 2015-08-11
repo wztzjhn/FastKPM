@@ -34,33 +34,17 @@ namespace fkpm {
     template <typename T>
     void Engine<T>::set_R_identity(int n, int j_start, int j_end) {
         assert (0 <= j_start && j_start <= j_end && j_end <= n);
-        
         R.set_size(n, j_end-j_start);
         R.fill(0.0);
         for (int j = j_start; j < j_end; j++) {
             R(j, j-j_start) = 1.0;
         }
+        R2 = R;
         transfer_R();
     }
     template <typename T>
     void Engine<T>::set_R_identity(int n) {
         set_R_identity(n, 0, n);
-    }
-    
-    template <typename T>
-    void Engine<T>::set_R2_identity(int n, int j_start, int j_end) {
-        assert (0 <= j_start && j_start <= j_end && j_end <= n);
-        
-        R2.set_size(n, j_end-j_start);
-        R2.fill(0.0);
-        for (int j = j_start; j < j_end; j++) {
-            R2(j, j-j_start) = 1.0;
-        }
-        transfer_R2();
-    }
-    template <typename T>
-    void Engine<T>::set_R2_identity(int n) {
-        set_R2_identity(n, 0, n);
     }
     
     template <typename T>
@@ -74,29 +58,18 @@ namespace fkpm {
                 R(i, j-j_start) = random_phase<T>(rng_j) * x;
             }
         }
-        transfer_R();
-    }
-    template <typename T>
-    void Engine<T>::set_R_uncorrelated(int n, int s, RNG& rng) {
-        set_R_uncorrelated(n, s, rng, 0, s);
-    }
-    
-    template <typename T>
-    void Engine<T>::set_R2_uncorrelated(int n, int s, RNG& rng, int j_start, int j_end) {
-        assert (0 <= j_start && j_start <= j_end && j_end <= s);
         R2.set_size(n, j_end-j_start);
-        T x = 1.0 / sqrt(s);
         for (int j = j_start; j < j_end; j++) {
             RNG rng_j(rng()); // new RNG sequence for each column j
             for (int i = 0; i < n; i++) {
                 R2(i, j-j_start) = random_phase<T>(rng_j) * x;
             }
         }
-        transfer_R2();
+        transfer_R();
     }
     template <typename T>
-    void Engine<T>::set_R2_uncorrelated(int n, int s, RNG& rng) {
-        set_R2_uncorrelated(n, s, rng, 0, s);
+    void Engine<T>::set_R_uncorrelated(int n, int s, RNG& rng) {
+        set_R_uncorrelated(n, s, rng, 0, s);
     }
     
     template <typename T>
@@ -110,6 +83,16 @@ namespace fkpm {
             for (int i = 0; i < n; i++) {
                 if (groups[i] == j) {
                     R(i, j-j_start) = random_phase<T>(rng_j);
+                }
+            }
+        }
+        R2.set_size(n, j_end-j_start);
+        R2.fill(0.0);
+        for (int j = j_start; j < j_end; j++) {
+            RNG rng_j(rng()); // new RNG sequence for each column j
+            for (int i = 0; i < n; i++) {
+                if (groups[i] == j) {
+                    R2(i, j-j_start) = random_phase<T>(rng_j);
                 }
             }
         }
