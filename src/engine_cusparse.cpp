@@ -355,8 +355,12 @@ namespace fkpm {
         void transfer_R() {
             TRY(cudaSetDevice(device));
             
-            int sz = this->R.size();
+            if (this->R.n_cols == 0) {
+                std::cerr << "Cannot handle empty R matrix! Device " << device << ". Exiting.\n";
+                std::exit(EXIT_FAILURE);
+            }
             
+            int sz = this->R.size();
             xi_d.resize(sz);
             R_d.resize(sz);
             t_d.resize(sz);
