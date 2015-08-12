@@ -481,10 +481,15 @@ namespace fkpm {
             return mu;
         }
         
-        
-//        Vec<Vec<cx_double>> moments2_v1_old(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op, int a_chunk_ncols) {
+//        // comment: this is the memory saving version, but slower (still faster than CPU of course)
+//        // zw: probably let's leave this old version in this source code for a while,
+//        //     before finally cleaning up the code.
+//        //     (in case we have huge size simulation, which may using up memory for the new version)
+//        Vec<Vec<cx_double>> moments2_v1(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op, int a_chunk_ncols) {
 //            int R_chunk_ncols = 1;
 //            TRY(cudaSetDevice(device));
+//            if (a_chunk_ncols * this->R.n_rows > 3e7)
+//                std::cout << "Warning: storage of alpha & atild using more than 2G memory on GPU" << std::endl;
 //            
 //            CuVec<int> j1_RowPtr_d, j1_ColIdx_d, j2_RowPtr_d, j2_ColIdx_d;
 //            CuVec<T>   j1_Values_d, j2_Values_d;
@@ -587,9 +592,14 @@ namespace fkpm {
 //            return mu;
 //        }
         
+        // comment: this version is faster, but using "s" times memory than the old version.
+        // In case lack of memory: we can either slightly reduce "a_chunk_ncols", or distributing
+        // the random vectors into different GPUs.
         Vec<Vec<cx_double>> moments2_v1(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op, int a_chunk_ncols) {
             TRY(cudaSetDevice(device));
-            
+            if (a_chunk_ncols * this->R.n_rows * this->R.n_cols > 3e7)
+                std::cout << "\nWarning: storage of alpha & atild using more than 1G memory on GPU\n";
+
             CuVec<int> j1_RowPtr_d, j1_ColIdx_d, j2_RowPtr_d, j2_ColIdx_d;
             CuVec<T>   j1_Values_d, j2_Values_d;
             j1_RowPtr_d.from_host(j1op.row_ptr.size(), j1op.row_ptr.data());
