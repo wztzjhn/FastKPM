@@ -17,10 +17,10 @@ namespace fkpm {
 
 #include <cstdlib>
 #include <cassert>
+#include <thread>
 #include <cuda_runtime.h>
 #include <cusparse_v2.h>
 #include <cublas_v2.h>
-
 
 #define TRY(x) gen_cuda_test_error((x), __FILE__, __LINE__, #x)
 
@@ -850,12 +850,22 @@ namespace fkpm {
         int n_threads;
         Vec<std::shared_ptr<Engine<T>>> workers;
         
+        void run_workers(std::function<void(int)> fn) {
+            Vec<std::thread> threads;
+            for (int t = 0; t < n_threads; t++) {
+                threads.push_back(std::thread(fn, t));
+            }
+            for (int t = 0; t < n_threads; t++) {
+                threads[t].join();
+            }
+        }
+        
         Engine_Threaded(Vec<std::shared_ptr<Engine<T>>> workers):
             n_threads(workers.size()),
             workers(workers) {}
         
         void set_R_identity(int n, int j_start, int j_end) {
-            parallel_for(0, n_threads, [&](int t) {
+            run_workers([&](int t) {
                 int sz = j_end - j_start;
                 int j1 = j_start + t * sz / n_threads;
                 int j2 = j_start + (t + 1) * sz / n_threads;
@@ -864,7 +874,7 @@ namespace fkpm {
         }
         
         void set_R_uncorrelated(int n, int s, RNG& rng, int j_start, int j_end) {
-            parallel_for(0, n_threads, [&](int t) {
+            run_workers([&](int t) {
                 RNG rng0 = rng;
                 int sz = j_end - j_start;
                 int j1 = j_start + t * sz / n_threads;
@@ -876,7 +886,7 @@ namespace fkpm {
         }
         
         void set_R_correlated(Vec<int> const& groups, RNG& rng, int j_start, int j_end) {
-            parallel_for(0, n_threads, [&](int t) {
+            run_workers([&](int t) {
                 RNG rng0 = rng;
                 int sz = j_end - j_start;
                 int j1 = j_start + t * sz / n_threads;
@@ -888,14 +898,14 @@ namespace fkpm {
         }
         
         void set_H(SpMatBsr<T> const& H, EnergyScale const& es) {
-            parallel_for(0, n_threads, [&](int t) {
+            run_workers([&](int t) {
                 workers[t]->set_H(H, es);
             });
         }
         
         Vec<double> moments(int M) {
             Vec<Vec<double>> mus(n_threads);
-            parallel_for(0, n_threads, [&](int t) {
+            run_workers([&](int t) {
                 mus[t] = workers[t]->moments(M);
             });
             for (int t = 1; t < n_threads; t++) {
@@ -922,7 +932,7 @@ namespace fkpm {
         
         void stoch_matrix(Vec<double> const& c, SpMatBsr<T>& D) {
             Vec<SpMatBsr<T>> Ds(n_threads, D);
-            parallel_for(0, n_threads, [&](int t) {
+            run_workers([&](int t) {
                 workers[t]->stoch_matrix(c, Ds[t]);
             });
             D.zeros();
@@ -935,7 +945,7 @@ namespace fkpm {
         
         void autodiff_matrix(Vec<double> const& c, SpMatBsr<T>& D) {
             Vec<SpMatBsr<T>> Ds(n_threads, D);
-            parallel_for(0, n_threads, [&](int t) {
+            run_workers([&](int t) {
                 workers[t]->autodiff_matrix(c, Ds[t]);
             });
             D.zeros();
