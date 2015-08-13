@@ -4,13 +4,13 @@
 
 namespace fkpm {
     template <typename T>
-    std::shared_ptr<Engine<T>> mk_engine_cuSPARSE(int device) {
+    std::shared_ptr<Engine<T>> mk_engine_cuSPARSE(Vec<int> devices) {
         return nullptr;
     }
-    template std::shared_ptr<Engine<float>> mk_engine_cuSPARSE(int device);
-    template std::shared_ptr<Engine<double>> mk_engine_cuSPARSE(int device);
-    template std::shared_ptr<Engine<cx_float>> mk_engine_cuSPARSE(int device);
-    template std::shared_ptr<Engine<cx_double>> mk_engine_cuSPARSE(int device);
+    template std::shared_ptr<Engine<float>> mk_engine_cuSPARSE(Vec<int> devices);
+    template std::shared_ptr<Engine<double>> mk_engine_cuSPARSE(Vec<int> devices);
+    template std::shared_ptr<Engine<cx_float>> mk_engine_cuSPARSE(Vec<int> devices);
+    template std::shared_ptr<Engine<cx_double>> mk_engine_cuSPARSE(Vec<int> devices);
 }
 
 #else
