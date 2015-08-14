@@ -68,6 +68,7 @@ namespace fkpm {
             
             alpha.set_size(n,a_chunk_ncols);
             atild.set_size(n,a_chunk_ncols);
+            arma::Col<T> atild_temp(n);
             Vec<Vec<cx_double>> mu(M);
             for (int i = 0; i < M; i++) {
                 mu[i].resize(M, cx_double(0.0, 0.0)); // mu = 0
@@ -98,9 +99,10 @@ namespace fkpm {
                         }
                         for (int m2 = 2; m2 <= atild_end - atild_begin; m2++)
                             atild.col(m2) = 2 * Hs * atild.col(m2-1) - atild.col(m2-2);
-                        for (int m1 = alpha_begin; m1 <= alpha_end; m1++) {
-                            for (int m2 = atild_begin; m2 <= atild_end; m2++) {
-                                mu[m1][m2] += arma::cdot(alpha.col(m1-alpha_begin), j2 * atild.col(m2-atild_begin));
+                        for (int m2 = atild_begin; m2 <= atild_end; m2++) {
+                            atild_temp = j2 * atild.col(m2-atild_begin);
+                            for (int m1 = alpha_begin; m1 <= alpha_end; m1++) {
+                                mu[m1][m2] += arma::cdot(alpha.col(m1-alpha_begin), atild_temp);
                             }
                         }
                         atild_begin = atild_end + 1;
@@ -110,6 +112,7 @@ namespace fkpm {
                     alpha_end   = std::min(M-1, alpha_end + a_chunk_ncols);
                 }
             }
+            atild_temp.reset();
             alpha.reset();
             atild.reset();
             

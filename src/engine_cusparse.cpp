@@ -488,8 +488,6 @@ namespace fkpm {
 //        Vec<Vec<cx_double>> moments2_v1(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op, int a_chunk_ncols) {
 //            int R_chunk_ncols = 1;
 //            TRY(cudaSetDevice(device));
-//            if (a_chunk_ncols * this->R.n_rows > 3e7)
-//                std::cout << "Warning: storage of alpha & atild using more than 2G memory on GPU" << std::endl;
 //            
 //            CuVec<int> j1_RowPtr_d, j1_ColIdx_d, j2_RowPtr_d, j2_ColIdx_d;
 //            CuVec<T>   j1_Values_d, j2_Values_d;
@@ -508,6 +506,9 @@ namespace fkpm {
 //            if (a_chunk_ncols < 0)
 //                a_chunk_ncols = 10;
 //            assert(a_chunk_ncols >= 3 && a_chunk_ncols <= M);
+//            if (a_chunk_ncols * n > 3e7)
+//                std::cout << "\nWarning: alpha&atild >= 1G mem on GPU; "
+//                          << "a_chunk_ncols=" << a_chunk_ncols << std::endl;
 //            
 //            Vec<CuVec<T>> alpha(a_chunk_ncols);
 //            Vec<CuVec<T>> atild(a_chunk_ncols);
@@ -518,6 +519,7 @@ namespace fkpm {
 //            for (int i = 0; i < M; i++) mu[i].resize(M, 0);
 //            
 //            CuVec<T> Rchunk_d, temp_d;
+//            T_cu result_temp;
 //            temp_d.resize(n);
 //            temp_d.memset(0);
 //            alpha[1].memset(0);
@@ -560,13 +562,12 @@ namespace fkpm {
 //                            atild[m2].from_device(atild[m2-2]);
 //                            cgemv_H(2, atild[m2-1], -1, atild[m2]);
 //                        }
-//                        for (int m1 = alpha_begin; m1 <= alpha_end; m1++) {
-//                            for (int m2 = atild_begin; m2 <= atild_end; m2++) {
-//                                T_cu result_temp;
-//                                TRY(gen_bsrmv(cs_handle, CUSPARSE_DIRECTION_COLUMN, CUSPARSE_OPERATION_NON_TRANSPOSE,
-//                                              n_rows, n_rows, n_blocks, &one_cu, cs_mat_descr,
-//                                              (T_cu *)j2_Values_d.ptr, j2_RowPtr_d.ptr, j2_ColIdx_d.ptr, b_len,
-//                                              (T_cu *)atild[m2-atild_begin].ptr, &zero_cu, (T_cu *)temp_d.ptr));
+//                        for (int m2 = atild_begin; m2 <= atild_end; m2++) {
+//                            TRY(gen_bsrmv(cs_handle, CUSPARSE_DIRECTION_COLUMN, CUSPARSE_OPERATION_NON_TRANSPOSE,
+//                                          n_rows, n_rows, n_blocks, &one_cu, cs_mat_descr,
+//                                          (T_cu *)j2_Values_d.ptr, j2_RowPtr_d.ptr, j2_ColIdx_d.ptr, b_len,
+//                                          (T_cu *)atild[m2-atild_begin].ptr, &zero_cu, (T_cu *)temp_d.ptr));
+//                            for (int m1 = alpha_begin; m1 <= alpha_end; m1++) {
 //                                TRY(gen_dotc(bl_handle, n, (T_cu *)alpha[m1-alpha_begin].ptr, 1, (T_cu *)temp_d.ptr, 1, &result_temp));
 //                                mu[m1][m2] += cuda_cmplx(result_temp);
 //                            }
@@ -597,8 +598,6 @@ namespace fkpm {
         // the random vectors into different GPUs.
         Vec<Vec<cx_double>> moments2_v1(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op, int a_chunk_ncols) {
             TRY(cudaSetDevice(device));
-            if (a_chunk_ncols * this->R.n_rows * this->R.n_cols > 3e7)
-                std::cout << "\nWarning: storage of alpha & atild using more than 1G memory on GPU\n";
 
             CuVec<int> j1_RowPtr_d, j1_ColIdx_d, j2_RowPtr_d, j2_ColIdx_d;
             CuVec<T>   j1_Values_d, j2_Values_d;
@@ -620,6 +619,9 @@ namespace fkpm {
             if (a_chunk_ncols < 0)
                 a_chunk_ncols = 10;
             assert(a_chunk_ncols >= 3 && a_chunk_ncols <= M);
+            if (a_chunk_ncols * sz > 3e7)
+                std::cout << "\nWarning: alpha&atild >= 1G mem on GPU; "
+                          << "a_chunk_ncols=" << a_chunk_ncols << std::endl;
             
             Vec<CuVec<T>> alpha(a_chunk_ncols);
             Vec<CuVec<T>> atild(a_chunk_ncols);
@@ -632,6 +634,7 @@ namespace fkpm {
             for (int i = 0; i < M; i++) mu[i].resize(M, 0);
             
             CuVec<T> temp_d;
+            T_cu result_temp;
             temp_d.resize(sz);
             temp_d.memset(0);
             alpha[1].memset(0);
@@ -674,15 +677,14 @@ namespace fkpm {
                         atild[m2].from_device(atild[m2-2]);
                         cgemm_H(2, atild[m2-1], -1, atild[m2]);
                     }
-                    for (int m1 = alpha_begin; m1 <= alpha_end; m1++) {
-                        for (int m2 = atild_begin; m2 <= atild_end; m2++) {
-                            T_cu result_temp;
-                            TRY(gen_bsrmm(cs_handle, CUSPARSE_DIRECTION_COLUMN, CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_TRANSPOSE,
-                                          n_rows, s, n_rows, n_blocks, &one_cu, cs_mat_descr,
-                                          (T_cu *)j2_Values_d.ptr, j2_RowPtr_d.ptr, j2_ColIdx_d.ptr, b_len,
-                                          (T_cu *)atild[m2-atild_begin].ptr, s, &zero_cu, (T_cu *)t_d.ptr, n));
-                            TRY(gen_geam(bl_handle, CUBLAS_OP_T, CUBLAS_OP_N, s, n, &one_cu, (T_cu *)t_d.ptr, n,
-                                         &zero_cu, (T_cu *)temp_d.ptr, s, (T_cu *)temp_d.ptr, s));
+                    for (int m2 = atild_begin; m2 <= atild_end; m2++) {
+                        TRY(gen_bsrmm(cs_handle, CUSPARSE_DIRECTION_COLUMN, CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_TRANSPOSE,
+                                      n_rows, s, n_rows, n_blocks, &one_cu, cs_mat_descr,
+                                      (T_cu *)j2_Values_d.ptr, j2_RowPtr_d.ptr, j2_ColIdx_d.ptr, b_len,
+                                      (T_cu *)atild[m2-atild_begin].ptr, s, &zero_cu, (T_cu *)t_d.ptr, n));
+                        TRY(gen_geam(bl_handle, CUBLAS_OP_T, CUBLAS_OP_N, s, n, &one_cu, (T_cu *)t_d.ptr, n,
+                                     &zero_cu, (T_cu *)temp_d.ptr, s, (T_cu *)temp_d.ptr, s));
+                        for (int m1 = alpha_begin; m1 <= alpha_end; m1++) {
                             TRY(gen_dotc(bl_handle, sz, (T_cu *)alpha[m1-alpha_begin].ptr, 1, (T_cu *)temp_d.ptr, 1, &result_temp));
                             mu[m1][m2] += cuda_cmplx(result_temp);
                         }
@@ -695,6 +697,7 @@ namespace fkpm {
             }
             
             temp_d.deallocate();
+            atild0_d.deallocate();
             j1_RowPtr_d.deallocate();
             j1_ColIdx_d.deallocate();
             j1_Values_d.deallocate();
