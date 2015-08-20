@@ -41,6 +41,10 @@ namespace fkpm {
     public:
         Vec<uint8_t> buffer;
         
+        void reset() {
+            buffer.clear();
+        }
+        
         void write_bytes(uint8_t const* data, size_t size) {
             buffer.insert(buffer.end(), data, data+size);
         }
@@ -76,12 +80,12 @@ namespace fkpm {
         Vec<uint8_t> buffer;
         int pos = 0;
         
-        void reset(size_t size) {
-            buffer.resize(size);
+        void init_empty(size_t size) {
+            buffer.resize(size, 0);
             pos = 0;
         }
         
-        void reset(Serializer const& ser) {
+        void init(Serializer const& ser) {
             buffer = ser.buffer;
             pos = 0;
         }
@@ -184,7 +188,7 @@ namespace fkpm {
                     Cmd cmd;
                     MPI_Bcast(&cmd, 2, MPI_INT, root_rank, MPI_COMM_WORLD);
                     if (cmd.size > 0) {
-                        des.reset(cmd.size);
+                        des.init_empty(cmd.size);
                         MPI_Bcast(des.buffer.data(), cmd.size, MPI_BYTE, root_rank, MPI_COMM_WORLD);
                     }
                     if (cmd.tag == tag_quit)
@@ -207,10 +211,10 @@ namespace fkpm {
             Cmd cmd = { tag, static_cast<int>(ser.buffer.size()) };
             MPI_Bcast(&cmd, 2, MPI_INT, root_rank, MPI_COMM_WORLD);
             MPI_Bcast(ser.buffer.data(), ser.buffer.size(), MPI_BYTE, root_rank, MPI_COMM_WORLD);
-            des.reset(ser);
-            ser.buffer.clear();
+            des.init(ser);
+            ser.reset();
             exec_cmds[tag](this);
-            des.reset(ser);
+            des.init(ser);
         }
         
         void exec_set_R_identity() {
@@ -222,7 +226,7 @@ namespace fkpm {
             worker->set_R_identity(n, j1, j2);
         }
         void set_R_identity(int n, int j_start, int j_end) {
-            ser.buffer.clear();
+            ser.reset();
             ser << n << j_start << j_end;
             broadcast_cmd(tag_set_R_identity);
         }
@@ -240,7 +244,7 @@ namespace fkpm {
             ser << rng;
         }
         void set_R_uncorrelated(int n, int s, RNG& rng, int j_start, int j_end) {
-            ser.buffer.clear();
+            ser.reset();
             ser << n << s << rng << j_start << j_end;
             broadcast_cmd(tag_set_R_uncorrelated);
             des >> rng;
@@ -260,7 +264,7 @@ namespace fkpm {
             ser << rng;
         }
         void set_R_correlated(Vec<int> const& groups, RNG& rng, int j_start, int j_end) {
-            ser.buffer.clear();
+            ser.reset();
             ser << groups << rng << j_start << j_end;
             broadcast_cmd(tag_set_R_correlated);
             des >> rng;
@@ -273,7 +277,7 @@ namespace fkpm {
             worker->set_H(H, es);
         }
         void set_H(SpMatBsr<T> const& H, EnergyScale const& es) {
-            ser.buffer.clear();
+            ser.reset();
             ser << H << es;
             broadcast_cmd(tag_set_H);
         }
@@ -286,7 +290,7 @@ namespace fkpm {
             ser << reduced;
         }
         Vec<double> moments(int M) {
-            ser.buffer.clear();
+            ser.reset();
             ser << M;
             broadcast_cmd(tag_moments);
             return des.take<Vec<double>>();
@@ -301,7 +305,7 @@ namespace fkpm {
             ser << mu;
         }
         Vec<Vec<cx_double>> moments2_v1(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op, int a_chunk_ncols=-1) {
-            ser.buffer.clear();
+            ser.reset();
             ser << M << j1op << j2op << a_chunk_ncols;
             broadcast_cmd(tag_moments2_v1);
             return des.take<Vec<Vec<cx_double>>>();
@@ -316,7 +320,7 @@ namespace fkpm {
             ser << mu;
         }
         Vec<Vec<cx_double>> moments2_v2(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op, int a_chunk_ncols=-1) {
-            ser.buffer.clear();
+            ser.reset();
             ser << M << j1op << j2op << a_chunk_ncols;
             broadcast_cmd(tag_moments2_v2);
             return des.take<Vec<Vec<cx_double>>>();
@@ -332,7 +336,7 @@ namespace fkpm {
             ser << reduced;
         }
         void stoch_matrix(Vec<double> const& c, SpMatBsr<T>& D) {
-            ser.buffer.clear();
+            ser.reset();
             ser << c << D;
             broadcast_cmd(tag_stoch_matrix);
             des >> D.val;
@@ -348,7 +352,7 @@ namespace fkpm {
             ser << reduced;
         }
         void autodiff_matrix(Vec<double> const& c, SpMatBsr<T>& D) {
-            ser.buffer.clear();
+            ser.reset();
             ser << c << D;
             broadcast_cmd(tag_autodiff_matrix);
             des >> D.val;
