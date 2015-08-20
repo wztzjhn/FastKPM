@@ -25,6 +25,7 @@ namespace fkpm {
 
 #include <mpi.h>
 #include <cassert>
+#include <climits>
 #include <cstdint>
 #include <cstring>
 #include <type_traits>
@@ -51,7 +52,7 @@ namespace fkpm {
         
         template <typename T, class=typename std::enable_if<IS_TRIVIALLY_COPYABLE(T)>::type>
         Serializer& operator<< (T const& x) {
-            write_bytes((uint8_t *)&x, sizeof(T));
+            write_bytes((uint8_t *)&x, sizeof(T)*CHAR_BIT/8);
             return *this;
         }
         
@@ -59,7 +60,7 @@ namespace fkpm {
         Serializer& operator<< (Vec<T> const& x) {
             *this << x.size();
             if (IS_TRIVIALLY_COPYABLE(T)) {
-                write_bytes((uint8_t *)x.data(), x.size()*sizeof(T));
+                write_bytes((uint8_t *)x.data(), x.size()*sizeof(T)*CHAR_BIT/8);
             }
             else {
                 for (int i = 0; i < x.size(); i++) {
@@ -98,7 +99,7 @@ namespace fkpm {
         
         template <typename T, class=typename std::enable_if<IS_TRIVIALLY_COPYABLE(T)>::type>
         Deserializer& operator>> (T& x) {
-            read_bytes((uint8_t *)&x, sizeof(T));
+            read_bytes((uint8_t *)&x, sizeof(T)*CHAR_BIT/8);
             return *this;
         }
         
@@ -107,7 +108,7 @@ namespace fkpm {
             size_t size; *this >> size;
             x.resize(size);
             if (IS_TRIVIALLY_COPYABLE(T)) {
-                read_bytes((uint8_t *)x.data(), x.size()*sizeof(T));
+                read_bytes((uint8_t *)x.data(), x.size()*sizeof(T)*CHAR_BIT/8);
             }
             else {
                 for (int i = 0; i < size; i++) {
