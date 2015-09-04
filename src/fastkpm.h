@@ -137,6 +137,7 @@ namespace fkpm {
     // C_{mn} for optical conductivity (finite omega) or static conductivity (zero omega)
     // unit: e^2/h
     Vec<Vec<cx_double>> electrical_conductivity_coefficients(int M, int Mq, double kT, double mu, double omega, EnergyScale es, Vec<double> const& kernel);
+    Vec<Vec<cx_double>> electrical_conductivity_coefficients_v2(int M, int Mq, double kT, double mu, double omega, EnergyScale es, Vec<double> const& kernel);
     
     // Calculate \sum c_m mu_m
     double moment_product(Vec<double> const& c, Vec<double> const& mu);

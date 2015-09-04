@@ -46,6 +46,14 @@ if (TBB_FOUND)
   add_definitions(-DWITH_TBB)
 endif()
 
+# Thread Building Blocks
+find_package(FFTW)
+if (FFTW_FOUND)
+  include_directories(SYSTEM ${FFTW_INCLUDE_DIRS})
+  set(LIBS ${LIBS} ${FFTW_LIBRARIES})
+  add_definitions(-DWITH_FFTW)
+endif()
+
 # MPI
 find_package(MPI)
 if (MPI_FOUND)

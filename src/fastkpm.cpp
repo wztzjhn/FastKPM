@@ -9,6 +9,7 @@
 #include <cassert>
 #include <algorithm>
 #include <boost/math/tools/roots.hpp>
+#include <fftw3.h>
 #include "fastkpm.h"
 
 
@@ -72,7 +73,7 @@ namespace fkpm {
         int n_neglect = 5;                              // neglect points near the boundary
         double omega_scaled = omega / es.mag();         // rescale omega
         Vec<Vec<cx_double>> ret(M);
-        for (int i = 0; i < M; i++) {                   // initialize mu to 0
+        for (int i = 0; i < M; i++) {                   // initialize cmn to 0
             ret[i].resize(M, 0.0);
         }
         if (omega_scaled >= 2.0 ) return ret;
@@ -115,13 +116,85 @@ namespace fkpm {
             }
         }
         for (int m1 = 0; m1 < M; m1++) {
+            double temp_m1 = 2.0 * Pi * (m1 == 0 ? 1.0 : 2.0) * kernel[m1] / (Mq * es.mag() * es.mag());
             for (int m2 = 0; m2 < M; m2++) {
-                ret[m1][m2] *= 2.0 * Pi * cx_double((m1 == 0 ? 1.0 : 2.0) * (m2 == 0 ? 1.0 : 2.0)
-                                         * kernel[m1] * kernel[m2] / Mq, 0.0) / (es.mag() * es.mag());
+                double temp_m2 = temp_m1 * (m2 == 0 ? 1.0 : 2.0) * kernel[m2];
+                ret[m1][m2] *= cx_double(temp_m2, 0.0);
             }
         }
         return ret;
     }
+    
+    Vec<Vec<cx_double>> electrical_conductivity_coefficients_v2(int M, int Mq, double kT, double mu,
+                                                             double omega, EnergyScale es, Vec<double> const& kernel) {
+        assert(kernel.size() == M);
+        assert(Mq >= 2*M);                              // To simplify usage of Y_{m_1+m_2} (see notes on fft)
+        assert(omega >= 0.0);
+        int n_neglect = 5;                              // neglect points near the boundary
+        double omega_scaled = omega / es.mag();         // rescale omega
+        Vec<Vec<cx_double>> ret(M);
+        for (int i = 0; i < M; i++) {                   // initialize cmn to 0
+            ret[i].resize(M, 0.0);
+        }
+        if (omega_scaled >= 2.0 ) return ret;
+        int i_start = (omega_scaled > 1e-7) ? std::ceil(acos(1.0 - omega_scaled) / Pi * Mq - 0.5) : n_neglect;
+        if (i_start < n_neglect) std::cout << "Warning: Need larger Mq!" << std::endl;
+        if (omega_scaled>1e-7) {
+            std::cerr << "fft not implemented for finite omega yet, please use old version!\n";
+            std::exit(EXIT_FAILURE);
+        }
+        
+        double *x1, *x2, *yc1, *yc2, *ys1, *ys2;
+        fftw_plan p1, p2, p3, p4;
+        x1  = (double*) fftw_malloc(sizeof(double) * Mq);
+        x2  = (double*) fftw_malloc(sizeof(double) * Mq);
+        yc1 = (double*) fftw_malloc(sizeof(double) * Mq);
+        yc2 = (double*) fftw_malloc(sizeof(double) * Mq);
+        ys1 = (double*) fftw_malloc(sizeof(double) * Mq);
+        ys2 = (double*) fftw_malloc(sizeof(double) * Mq);
+        for (int i = 0; i < Mq; i++) {
+            double x_i = cos(Pi * (i+0.5) / Mq);
+            double f_i = fermi_density(es.unscale(x_i), kT, mu);
+            x1[i] = f_i * x_i / std::pow(1.0-x_i*x_i, 1.5);
+            x2[i] = f_i / (1.0-x_i*x_i);
+        }
+        p1  = fftw_plan_r2r_1d(Mq, x1, yc1, FFTW_REDFT10, FFTW_ESTIMATE);  // DCT-II
+        fftw_execute(p1);
+        p2  = fftw_plan_r2r_1d(Mq, x2, yc2, FFTW_REDFT10, FFTW_ESTIMATE);  // DCT-II
+        fftw_execute(p2);
+        p3  = fftw_plan_r2r_1d(Mq, x1, ys1, FFTW_RODFT10, FFTW_ESTIMATE);  // DST-II
+        fftw_execute(p3);
+        p4  = fftw_plan_r2r_1d(Mq, x2, ys2, FFTW_RODFT10, FFTW_ESTIMATE);  // DST-II
+        fftw_execute(p4);
+        fftw_destroy_plan(p1);
+        fftw_destroy_plan(p2);
+        fftw_destroy_plan(p3);
+        fftw_destroy_plan(p4);
+        fftw_free(x1);
+        fftw_free(x2);
+        
+        for (int m1 = 0; m1 < M; m1++) {
+            double temp_m1 = Pi * (m1 == 0 ? 1.0 : 2.0) * kernel[m1] / (2.0 * Mq * es.mag() * es.mag());
+            for (int m2 = 0; m2 < M; m2++) {
+                double temp_m2 = temp_m1 * (m2 == 0 ? 1.0 : 2.0) * kernel[m2];
+                int m_sum   = m1 + m2;
+                int m_dif   = m1 - m2;
+                double y_re =  2.0 * yc1[m_sum]
+                             + 2.0 * (m_dif >= 0 ? yc1[m_dif] : yc1[-m_dif])
+                             + m_sum * (m_sum > 0 ? ys2[m_sum-1] : 0.0)
+                             + m_dif * (m_dif > 0 ? ys2[m_dif-1] : (m_dif < 0 ? -ys2[-m_dif-1] : 0.0));
+                double y_im =  2.0 * (m_dif > 0 ? ys1[m_dif-1] : (m_dif < 0 ? -ys1[-m_dif-1] : 0.0))
+                             - m_dif * (yc2[m_sum] + (m_dif >=0 ? yc2[m_dif] : yc2[-m_dif]));
+                ret[m1][m2] = cx_double(temp_m2 * y_re, temp_m2 * y_im);
+            }
+        }
+        fftw_free(yc1);
+        fftw_free(yc2);
+        fftw_free(ys1);
+        fftw_free(ys2);
+        return ret;
+    }
+
     
     Vec<double> moment_transform(Vec<double> const& moments, int Mq) {
         int M = moments.size();
