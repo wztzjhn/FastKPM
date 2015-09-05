@@ -130,15 +130,15 @@ namespace fkpm {
         assert(kernel.size() == M);
         assert(Mq >= 2*M);                              // To simplify usage of Y_{m_1+m_2} (see notes on fft)
         assert(omega >= 0.0);
-        int n_neglect = 5;                              // neglect points near the boundary
+        double cutoff = 1e-4;                           // neglect points near the boundary
         double omega_scaled = omega / es.mag();         // rescale omega
         Vec<Vec<cx_double>> ret(M);
         for (int i = 0; i < M; i++) {                   // initialize cmn to 0
             ret[i].resize(M, 0.0);
         }
         if (omega_scaled >= 2.0 ) return ret;
-        int i_start = (omega_scaled > 1e-7) ? std::ceil(acos(1.0 - omega_scaled) / Pi * Mq - 0.5) : n_neglect;
-        if (i_start < n_neglect) std::cout << "Warning: Need larger Mq!" << std::endl;
+        //int i_start = (omega_scaled > 1e-7) ? std::ceil(acos(1.0 - omega_scaled) / Pi * Mq - 0.5) : n_neglect;
+        //if (i_start < n_neglect) std::cout << "Warning: Need larger Mq!" << std::endl;
         if (omega_scaled>1e-7) {
             std::cerr << "fft not implemented for finite omega yet, please use old version!\n";
             std::exit(EXIT_FAILURE);
@@ -154,9 +154,14 @@ namespace fkpm {
         ys2 = (double*) fftw_malloc(sizeof(double) * Mq);
         for (int i = 0; i < Mq; i++) {
             double x_i = cos(Pi * (i+0.5) / Mq);
-            double f_i = fermi_density(es.unscale(x_i), kT, mu);
-            x1[i] = f_i * x_i / std::pow(1.0-x_i*x_i, 1.5);
-            x2[i] = f_i / (1.0-x_i*x_i);
+            if (1.0-x_i*x_i < cutoff) {
+                x1[i] = 0.0;
+                x2[i] = 0.0;
+            } else {
+                double f_i = fermi_density(es.unscale(x_i), kT, mu);
+                x1[i] = f_i * x_i / std::pow(1.0-x_i*x_i, 1.5);
+                x2[i] = f_i / (1.0-x_i*x_i);
+            }
         }
         p1  = fftw_plan_r2r_1d(Mq, x1, yc1, FFTW_REDFT10, FFTW_ESTIMATE);  // DCT-II
         fftw_execute(p1);
