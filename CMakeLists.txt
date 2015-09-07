@@ -46,7 +46,7 @@ if (TBB_FOUND)
   add_definitions(-DWITH_TBB)
 endif()
 
-# Thread Building Blocks
+# Fast Fourier Transform
 find_package(FFTW)
 if (FFTW_FOUND)
   include_directories(SYSTEM ${FFTW_INCLUDE_DIRS})

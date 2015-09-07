@@ -509,9 +509,9 @@ namespace fkpm {
         
         // C = (alpha H B^T)^T + beta C
         // H: n*n, B_d: s*n, C_d: s*n, t_d: n*s
-        void cgemm_H(T alpha, CuVec<T> const& B_d, T beta, CuVec<T> const& C_d) {
+        void cgemm_H(T alpha, CuVec<T> const& B_d, T beta, CuVec<T> const& C_d, int s = -1) {
             int n = this->R.n_rows;
-            int s = this->R.n_cols;
+            if (s < 1) s = this->R.n_cols;
             
             // t = H B^T
             TRY(gen_bsrmm(cs_handle, CUSPARSE_DIRECTION_COLUMN, CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_TRANSPOSE,
@@ -577,124 +577,18 @@ namespace fkpm {
             return mu;
         }
         
-//        // comment: this is the memory saving version, but slower (still faster than CPU of course)
-//        // zw: probably let's leave this old version in this source code for a while,
-//        //     before finally cleaning up the code.
-//        //     (in case we have huge size simulation, which may using up memory for the new version)
-//        Vec<Vec<cx_double>> moments2_v1(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op, int a_chunk_ncols) {
-//            int R_chunk_ncols = 1;
-//            TRY(cudaSetDevice(device));
-//            
-//            CuVec<int> j1_RowPtr_d, j1_ColIdx_d, j2_RowPtr_d, j2_ColIdx_d;
-//            CuVec<T>   j1_Values_d, j2_Values_d;
-//            j1_RowPtr_d.from_host(j1op.row_ptr.size(), j1op.row_ptr.data());
-//            j1_ColIdx_d.from_host(j1op.col_idx.size(), j1op.col_idx.data());
-//            j1_Values_d.from_host(j1op.val.size(),     j1op.val.data());
-//            j2_RowPtr_d.from_host(j2op.row_ptr.size(), j2op.row_ptr.data());
-//            j2_ColIdx_d.from_host(j2op.col_idx.size(), j2op.col_idx.data());
-//            j2_Values_d.from_host(j2op.val.size(),     j2op.val.data());
-//            int n = this->R.n_rows;
-//            assert(b_len * n_rows == n);
-//            assert(j1op.n_rows == n && j1op.n_cols == n);
-//            assert(j2op.n_rows == n && j2op.n_cols == n);
-//            assert(M % 2 == 0);
-//            
-//            if (a_chunk_ncols < 0)
-//                a_chunk_ncols = 10;
-//            assert(a_chunk_ncols >= 3 && a_chunk_ncols <= M);
-//            if (a_chunk_ncols * n > 3e7)
-//                std::cout << "\nWarning: alpha&atild >= 1G mem on GPU; "
-//                          << "a_chunk_ncols=" << a_chunk_ncols << std::endl;
-//            
-//            Vec<CuVec<T>> alpha(a_chunk_ncols);
-//            Vec<CuVec<T>> atild(a_chunk_ncols);
-//            for (int i = 0; i < a_chunk_ncols; i++) alpha[i].resize(n);
-//            for (int i = 0; i < a_chunk_ncols; i++) atild[i].resize(n);
-//            
-//            Vec<Vec<cx_double>> mu(M);
-//            for (int i = 0; i < M; i++) mu[i].resize(M, 0);
-//            
-//            CuVec<T> Rchunk_d, temp_d;
-//            T_cu result_temp;
-//            temp_d.resize(n);
-//            temp_d.memset(0);
-//            alpha[1].memset(0);
-//            atild[1].memset(0);
-//            for (int k = 0; k < this->R.n_cols ; k++) {
-//                int sz = (k + R_chunk_ncols <= this->R.n_cols) ? n*R_chunk_ncols : n*(this->R.n_cols-k);
-//                Rchunk_d.resize(sz);
-//                Rchunk_d.from_host(sz, this->R.colptr(k));  // Rchunk_d = R(:,col:col+num_schunk_used-1)
-//                
-//                int alpha_begin = 0;
-//                int alpha_end   = a_chunk_ncols - 1;
-//                alpha[0].from_device(Rchunk_d);         // \alpha_0^T
-//                cgemv_H(1, alpha[0], 0, alpha[1]);      // \alpha_1^T
-//                while (alpha_begin <= alpha_end) {
-//                    if (alpha_begin != 0) {
-//                        alpha[0].from_device(alpha[a_chunk_ncols-2]);
-//                        cgemv_H(2, alpha[a_chunk_ncols-1], -1, alpha[0]);
-//                        alpha[1].from_device(alpha[a_chunk_ncols-1]);
-//                        cgemv_H(2, alpha[0], -1, alpha[1]);
-//                    }
-//                    for (int m1 = 2; m1 <= alpha_end - alpha_begin; m1++) {
-//                        alpha[m1].from_device(alpha[m1-2]);
-//                        cgemv_H(2, alpha[m1-1], -1, alpha[m1]);
-//                    }
-//                    int atild_begin = 0;
-//                    int atild_end   = a_chunk_ncols - 1;
-//                    TRY(gen_bsrmv(cs_handle, CUSPARSE_DIRECTION_COLUMN, CUSPARSE_OPERATION_NON_TRANSPOSE,
-//                                  n_rows, n_rows, n_blocks, &one_cu, cs_mat_descr,
-//                                  (T_cu *)j1_Values_d.ptr, j1_RowPtr_d.ptr, j1_ColIdx_d.ptr, b_len,
-//                                  (T_cu *)Rchunk_d.ptr, &zero_cu, (T_cu *)atild[0].ptr));
-//                    cgemv_H(1, atild[0], 0, atild[1]);
-//                    while (atild_begin <= atild_end) {
-//                        if (atild_begin != 0) {
-//                            atild[0].from_device(atild[a_chunk_ncols-2]);
-//                            cgemv_H(2, atild[a_chunk_ncols-1], -1, atild[0]);
-//                            atild[1].from_device(atild[a_chunk_ncols-1]);
-//                            cgemv_H(2, atild[0], -1, atild[1]);
-//                        }
-//                        for (int m2 = 2; m2 <= atild_end - atild_begin; m2++) {
-//                            atild[m2].from_device(atild[m2-2]);
-//                            cgemv_H(2, atild[m2-1], -1, atild[m2]);
-//                        }
-//                        for (int m2 = atild_begin; m2 <= atild_end; m2++) {
-//                            TRY(gen_bsrmv(cs_handle, CUSPARSE_DIRECTION_COLUMN, CUSPARSE_OPERATION_NON_TRANSPOSE,
-//                                          n_rows, n_rows, n_blocks, &one_cu, cs_mat_descr,
-//                                          (T_cu *)j2_Values_d.ptr, j2_RowPtr_d.ptr, j2_ColIdx_d.ptr, b_len,
-//                                          (T_cu *)atild[m2-atild_begin].ptr, &zero_cu, (T_cu *)temp_d.ptr));
-//                            for (int m1 = alpha_begin; m1 <= alpha_end; m1++) {
-//                                TRY(gen_dotc(bl_handle, n, (T_cu *)alpha[m1-alpha_begin].ptr, 1, (T_cu *)temp_d.ptr, 1, &result_temp));
-//                                mu[m1][m2] += cuda_cmplx(result_temp);
-//                            }
-//                        }
-//                        atild_begin = atild_end + 1;
-//                        atild_end   = std::min(M-1, atild_end + a_chunk_ncols);
-//                    }
-//                    alpha_begin = alpha_end + 1;
-//                    alpha_end   = std::min(M-1, alpha_end + a_chunk_ncols);
-//                }
-//            }
-//            
-//            temp_d.deallocate();
-//            Rchunk_d.deallocate();
-//            j1_RowPtr_d.deallocate();
-//            j1_ColIdx_d.deallocate();
-//            j1_Values_d.deallocate();
-//            j2_RowPtr_d.deallocate();
-//            j2_ColIdx_d.deallocate();
-//            j2_Values_d.deallocate();
-//            for (int i = 0; i < alpha.size(); i++) alpha[i].deallocate();
-//            for (int i = 0; i < atild.size(); i++) atild[i].deallocate();
-//            return mu;
-//        }
-        
-        // comment: this version is faster, but using "s" times memory than the old version.
-        // In case lack of memory: we can either slightly reduce "a_chunk_ncols", or distributing
-        // the random vectors into different GPUs.
-        Vec<Vec<cx_double>> moments2_v1(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op, int a_chunk_ncols) {
+        // memory usage in moments2_v1 ~ a_chunk_ncols * R_chunk_ncols (if not including R used outside)
+        Vec<Vec<cx_double>> moments2_v1(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op,
+                                        int a_chunk_ncols, int R_chunk_ncols) {
+            Vec<Vec<cx_double>> mu(M);
+            for (int i = 0; i < M; i++) mu[i].resize(M, 0);
             TRY(cudaSetDevice(device));
-
+            size_t mem_free, mem_total;
+            double mem_percent;
+            TRY(cudaMemGetInfo(&mem_free,&mem_total));
+            mem_percent = 1.0- (double) mem_free/mem_total;
+            if(mem_percent > 0.7) std::cout << "Warning1: gpu mem used " << mem_percent << "!\n";
+            
             CuVec<int> j1_RowPtr_d, j1_ColIdx_d, j2_RowPtr_d, j2_ColIdx_d;
             CuVec<T>   j1_Values_d, j2_Values_d;
             j1_RowPtr_d.from_host(j1op.row_ptr.size(), j1op.row_ptr.data());
@@ -704,95 +598,107 @@ namespace fkpm {
             j2_ColIdx_d.from_host(j2op.col_idx.size(), j2op.col_idx.data());
             j2_Values_d.from_host(j2op.val.size(),     j2op.val.data());
             int n  = this->R.n_rows;
-            int s  = this->R.n_cols;
-            int sz = this->R.size();
-            assert(n * s == sz);
             assert(b_len * n_rows == n);
             assert(j1op.n_rows == n && j1op.n_cols == n);
             assert(j2op.n_rows == n && j2op.n_cols == n);
             assert(M % 2 == 0);
-            
-            if (a_chunk_ncols < 0)
-                a_chunk_ncols = 10;
-            assert(a_chunk_ncols >= 3 && a_chunk_ncols <= M);
-            if (a_chunk_ncols * sz > 3e7)
-                std::cout << "\nWarning: alpha&atild >= 1G mem on GPU; "
-                          << "a_chunk_ncols=" << a_chunk_ncols << std::endl;
-            
-            Vec<CuVec<T>> alpha(a_chunk_ncols);
-            Vec<CuVec<T>> atild(a_chunk_ncols);
-            CuVec<T> atild0_d;
+            if (a_chunk_ncols < 3) a_chunk_ncols = 10;
+            if (R_chunk_ncols < 1) R_chunk_ncols = 64;
+            if (a_chunk_ncols > M) a_chunk_ncols = M;
+            if (R_chunk_ncols > this->R.n_cols) R_chunk_ncols = this->R.n_cols;
+
+            Vec<CuVec<T>> alpha(a_chunk_ncols), atild(a_chunk_ncols);
+            CuVec<T> atild0_d, Rchunk_d, temp_d;
+            T_cu result_temp;
+            int s  = R_chunk_ncols;
+            int sz = n * s;
             for (int i = 0; i < a_chunk_ncols; i++) alpha[i].resize(sz);
             for (int i = 0; i < a_chunk_ncols; i++) atild[i].resize(sz);
             atild0_d.resize(sz);
-            
-            Vec<Vec<cx_double>> mu(M);
-            for (int i = 0; i < M; i++) mu[i].resize(M, 0);
-            
-            CuVec<T> temp_d;
-            T_cu result_temp;
+            Rchunk_d.resize(sz);
             temp_d.resize(sz);
-            temp_d.memset(0);
+            Rchunk_d.memset(0);
             alpha[1].memset(0);
             atild[1].memset(0);
             t_d.memset(0);
-            TRY(gen_bsrmm(cs_handle, CUSPARSE_DIRECTION_COLUMN, CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_TRANSPOSE,
-                          n_rows, s, n_rows, n_blocks, &one_cu, cs_mat_descr,
-                          (T_cu *)j1_Values_d.ptr, j1_RowPtr_d.ptr, j1_ColIdx_d.ptr, b_len,
-                          (T_cu *)R_d.ptr, s, &zero_cu, (T_cu *)t_d.ptr, n));
-            TRY(gen_geam(bl_handle, CUBLAS_OP_T, CUBLAS_OP_N, s, n, &one_cu, (T_cu *)t_d.ptr, n,
-                         &zero_cu, (T_cu *)atild0_d.ptr, s, (T_cu *)atild0_d.ptr, s));
             
-            int alpha_begin = 0;
-            int alpha_end   = a_chunk_ncols - 1;
-            alpha[0].from_device(R_d);              // \alpha_0^T
-            cgemm_H(1, alpha[0], 0, alpha[1]);      // \alpha_1^T
-            while (alpha_begin <= alpha_end) {
-                if (alpha_begin != 0) {
-                    alpha[0].from_device(alpha[a_chunk_ncols-2]);
-                    cgemm_H(2, alpha[a_chunk_ncols-1], -1, alpha[0]);
-                    alpha[1].from_device(alpha[a_chunk_ncols-1]);
-                    cgemm_H(2, alpha[0], -1, alpha[1]);
+            TRY(cudaMemGetInfo(&mem_free,&mem_total));
+            mem_percent = 1.0- (double) mem_free/mem_total;
+            if(mem_percent > 0.7) std::cout << "Warning2: gpu mem used " << mem_percent << "!\n";
+            
+            for (int k = 0; k < this->R.n_cols; k += R_chunk_ncols) {
+                if (k + R_chunk_ncols > this->R.n_cols) {
+                    s  = this->R.n_cols - k;
+                    sz = n * s;
+                    for (int i = 0; i < a_chunk_ncols; i++) alpha[i].resize(sz);
+                    for (int i = 0; i < a_chunk_ncols; i++) atild[i].resize(sz);
+                    atild0_d.resize(sz);
+                    Rchunk_d.resize(sz);
+                    temp_d.resize(sz);
+                    Rchunk_d.memset(0);
                 }
-                for (int m1 = 2; m1 <= alpha_end - alpha_begin; m1++) {
-                    alpha[m1].from_device(alpha[m1-2]);
-                    cgemm_H(2, alpha[m1-1], -1, alpha[m1]);
-                }
-                int atild_begin = 0;
-                int atild_end   = a_chunk_ncols - 1;
-                atild[0].from_device(atild0_d);
-                cgemm_H(1, atild[0], 0, atild[1]);
-                while (atild_begin <= atild_end) {
-                    if (atild_begin != 0) {
-                        atild[0].from_device(atild[a_chunk_ncols-2]);
-                        cgemm_H(2, atild[a_chunk_ncols-1], -1, atild[0]);
-                        atild[1].from_device(atild[a_chunk_ncols-1]);
-                        cgemm_H(2, atild[0], -1, atild[1]);
+                temp_d.from_host(sz, this->R.colptr(k));
+                TRY(gen_geam(bl_handle, CUBLAS_OP_T, CUBLAS_OP_N, s, n, &one_cu, (T_cu *)temp_d.ptr, n,
+                             &zero_cu, (T_cu *)Rchunk_d.ptr, s, (T_cu *)Rchunk_d.ptr, s));  // transfer Rchunk_d
+                TRY(gen_bsrmm(cs_handle, CUSPARSE_DIRECTION_COLUMN, CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_TRANSPOSE,
+                              n_rows, s, n_rows, n_blocks, &one_cu, cs_mat_descr,
+                              (T_cu *)j1_Values_d.ptr, j1_RowPtr_d.ptr, j1_ColIdx_d.ptr, b_len,
+                              (T_cu *)Rchunk_d.ptr, s, &zero_cu, (T_cu *)temp_d.ptr, n));
+                TRY(gen_geam(bl_handle, CUBLAS_OP_T, CUBLAS_OP_N, s, n, &one_cu, (T_cu *)temp_d.ptr, n,
+                             &zero_cu, (T_cu *)atild0_d.ptr, s, (T_cu *)atild0_d.ptr, s));  // atild0_d = (j1 * Rchunk_d^T)^T
+                int alpha_begin = 0;
+                int alpha_end   = a_chunk_ncols - 1;
+                alpha[0].from_device(Rchunk_d);         // \alpha_0^T
+                cgemm_H(1, alpha[0], 0, alpha[1], s);      // \alpha_1^T
+                while (alpha_begin <= alpha_end) {
+                    if (alpha_begin != 0) {
+                        alpha[0].from_device(alpha[a_chunk_ncols-2]);
+                        cgemm_H(2, alpha[a_chunk_ncols-1], -1, alpha[0], s);
+                        alpha[1].from_device(alpha[a_chunk_ncols-1]);
+                        cgemm_H(2, alpha[0], -1, alpha[1], s);
                     }
-                    for (int m2 = 2; m2 <= atild_end - atild_begin; m2++) {
-                        atild[m2].from_device(atild[m2-2]);
-                        cgemm_H(2, atild[m2-1], -1, atild[m2]);
+                    for (int m1 = 2; m1 <= alpha_end - alpha_begin; m1++) {
+                        alpha[m1].from_device(alpha[m1-2]);
+                        cgemm_H(2, alpha[m1-1], -1, alpha[m1], s);
                     }
-                    for (int m2 = atild_begin; m2 <= atild_end; m2++) {
-                        TRY(gen_bsrmm(cs_handle, CUSPARSE_DIRECTION_COLUMN, CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_TRANSPOSE,
-                                      n_rows, s, n_rows, n_blocks, &one_cu, cs_mat_descr,
-                                      (T_cu *)j2_Values_d.ptr, j2_RowPtr_d.ptr, j2_ColIdx_d.ptr, b_len,
-                                      (T_cu *)atild[m2-atild_begin].ptr, s, &zero_cu, (T_cu *)t_d.ptr, n));
-                        TRY(gen_geam(bl_handle, CUBLAS_OP_T, CUBLAS_OP_N, s, n, &one_cu, (T_cu *)t_d.ptr, n,
-                                     &zero_cu, (T_cu *)temp_d.ptr, s, (T_cu *)temp_d.ptr, s));
-                        for (int m1 = alpha_begin; m1 <= alpha_end; m1++) {
-                            TRY(gen_dotc(bl_handle, sz, (T_cu *)alpha[m1-alpha_begin].ptr, 1, (T_cu *)temp_d.ptr, 1, &result_temp));
-                            mu[m1][m2] += cuda_cmplx(result_temp);
+                    int atild_begin = 0;
+                    int atild_end   = a_chunk_ncols - 1;
+                    atild[0].from_device(atild0_d);
+                    cgemm_H(1, atild[0], 0, atild[1], s);
+                    while (atild_begin <= atild_end) {
+                        if (atild_begin != 0) {
+                            atild[0].from_device(atild[a_chunk_ncols-2]);
+                            cgemm_H(2, atild[a_chunk_ncols-1], -1, atild[0], s);
+                            atild[1].from_device(atild[a_chunk_ncols-1]);
+                            cgemm_H(2, atild[0], -1, atild[1], s);
                         }
+                        for (int m2 = 2; m2 <= atild_end - atild_begin; m2++) {
+                            atild[m2].from_device(atild[m2-2]);
+                            cgemm_H(2, atild[m2-1], -1, atild[m2], s);
+                        }
+                        for (int m2 = atild_begin; m2 <= atild_end; m2++) {
+                            TRY(gen_bsrmm(cs_handle, CUSPARSE_DIRECTION_COLUMN, CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_TRANSPOSE,
+                                          n_rows, s, n_rows, n_blocks, &one_cu, cs_mat_descr,
+                                          (T_cu *)j2_Values_d.ptr, j2_RowPtr_d.ptr, j2_ColIdx_d.ptr, b_len,
+                                          (T_cu *)atild[m2-atild_begin].ptr, s, &zero_cu, (T_cu *)t_d.ptr, n));
+                            TRY(gen_geam(bl_handle, CUBLAS_OP_T, CUBLAS_OP_N, s, n, &one_cu, (T_cu *)t_d.ptr, n,
+                                         &zero_cu, (T_cu *)temp_d.ptr, s, (T_cu *)temp_d.ptr, s));
+                            for (int m1 = alpha_begin; m1 <= alpha_end; m1++) {
+                                TRY(gen_dotc(bl_handle, sz, (T_cu *)alpha[m1-alpha_begin].ptr, 1, (T_cu *)temp_d.ptr, 1, &result_temp));
+                                //std::cout << "k=" << k << ",m1=" << m1 << ",m2=" << m2 << ",res=" << cuda_cmplx(result_temp)
+                                //<< std::endl;
+                                mu[m1][m2] += cuda_cmplx(result_temp);
+                            }
+                        }
+                        atild_begin = atild_end + 1;
+                        atild_end   = std::min(M-1, atild_end + a_chunk_ncols);
                     }
-                    atild_begin = atild_end + 1;
-                    atild_end   = std::min(M-1, atild_end + a_chunk_ncols);
+                    alpha_begin = alpha_end + 1;
+                    alpha_end   = std::min(M-1, alpha_end + a_chunk_ncols);
                 }
-                alpha_begin = alpha_end + 1;
-                alpha_end   = std::min(M-1, alpha_end + a_chunk_ncols);
             }
-            
             temp_d.deallocate();
+            Rchunk_d.deallocate();
             atild0_d.deallocate();
             j1_RowPtr_d.deallocate();
             j1_ColIdx_d.deallocate();
@@ -1019,11 +925,12 @@ namespace fkpm {
             return mus[0];
         }
         
-        Vec<Vec<cx_double>> moments2_v1(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op, int a_chunk_ncols=-1) {
+        Vec<Vec<cx_double>> moments2_v1(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op,
+                                        int a_chunk_ncols=-1, int R_chunk_ncols=-1) {
             if (n_threads > 1) {
                 std::cerr << "Threaded moments2_v1 not yet implemented!\n";
             }
-            return workers[0]->moments2_v1(M, j1op, j2op, a_chunk_ncols);
+            return workers[0]->moments2_v1(M, j1op, j2op, a_chunk_ncols, R_chunk_ncols);
         }
         
         Vec<Vec<cx_double>> moments2_v2(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op, int a_chunk_ncols=-1) {

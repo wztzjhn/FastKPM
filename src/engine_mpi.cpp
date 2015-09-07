@@ -310,7 +310,8 @@ namespace fkpm {
             assert(false && "Convert mu to matrix and implement reduce-sum");
             ser << mu;
         }
-        Vec<Vec<cx_double>> moments2_v1(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op, int a_chunk_ncols=-1) {
+        Vec<Vec<cx_double>> moments2_v1(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op,
+                                        int a_chunk_ncols=-1, int R_chunk_ncols=-1) {
             ser.reset();
             ser << M << j1op << j2op << a_chunk_ncols;
             broadcast_cmd(tag_moments2_v1);

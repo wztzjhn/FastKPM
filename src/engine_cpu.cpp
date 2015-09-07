@@ -84,7 +84,8 @@ namespace fkpm {
             return mu;
         }
 
-        Vec<Vec<cx_double>> moments2_v1(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op, int a_chunk_ncols) {
+        Vec<Vec<cx_double>> moments2_v1(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op,
+                                        int a_chunk_ncols, int R_chunk_ncols) {
             // The columns in the alpha-matrix correspond to alpha vectors of various Chebyshev order.
             // We operate on a single column r in the R matrix at a time.
             // Specifically,
