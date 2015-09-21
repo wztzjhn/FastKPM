@@ -353,29 +353,84 @@ namespace fkpm {
         }
         
         EnergyScale energy_scale(SpMatBsr<T> const& H, double extend, int iters) {
-            arma::SpMat<T> A = H.to_arma();
-            int n = A.n_rows;
-            arma::Col<T> v0(n), v1(n), w(n);
-            v0.zeros();
+            TRY(cudaSetDevice(device));
+            assert(H.n_rows == H.n_cols);
+            
+            // Storage for sparse matrix H
+            int n_rows = H.n_rows;
+            int b_len = H.b_len;
+            int n_blocks = H.n_blocks();
+            CuVec<int> HColIndex_d, HRowPtr_d;
+            CuVec<T> HVal_d;
+            HRowPtr_d.from_host(H.row_ptr.size(), H.row_ptr.data());
+            HColIndex_d.from_host(H.col_idx.size(), H.col_idx.data());
+            HVal_d.from_host(H.val.size(), H.val.data());
+            
+            // Storage for dense vectors
+            CuVec<T> v0_d, v1_d, w_d;
+            v0_d.resize(n_rows);
+            v0_d.memset(0);
+            arma::Col<T> v1(n_rows);
             v1.randn();
             v1 /= std::sqrt(std::real(arma::cdot(v1, v1)));
+            v1_d.from_host(n_rows, v1.memptr());
+            w_d.resize(n_rows);
             
+            // Storage for tridiagonal matrix elements
             Vec<double> alpha(iters), beta(iters);
             beta[0] = 0;
             
             for (int j = 1; j < iters; j++) {
-                w = A * v1;
-                alpha[j-1] = std::real(arma::cdot(w, v1));
-                w = w - alpha[j-1] * v1 - beta[j-1] * v0;
-                beta[j] = std::sqrt(std::real(arma::cdot(w, w)));
-                v0 = v1;
-                v1 = w / beta[j];
+                // w = H * v1
+                TRY(gen_bsrmv(cs_handle, CUSPARSE_DIRECTION_COLUMN, CUSPARSE_OPERATION_NON_TRANSPOSE,
+                              n_rows, n_rows, n_blocks, &one_cu, cs_mat_descr,
+                              (T_cu *)HVal_d.ptr, HRowPtr_d.ptr, HColIndex_d.ptr, b_len,
+                              (T_cu *)v1_d.ptr, &zero_cu, (T_cu *)w_d.ptr));
+                
+                // alpha[j-1] = real(w dot v1);
+                T_cu cdot_res;
+                TRY(gen_dotc(bl_handle, n_rows, (T_cu *)w_d.ptr, 1, (T_cu *)v1_d.ptr, 1, &cdot_res));
+                alpha[j-1] = cuda_real(cdot_res);
+                
+                // w = w - alpha[j-1] * v1 - beta[j-1] * v0;
+                T_cu scal = cuda_cast(T(-alpha[j-1]));
+                TRY(gen_axpy(bl_handle, n_rows, &scal, (T_cu *)v1_d.ptr, 1, (T_cu *)w_d.ptr, 1));
+                scal = cuda_cast(T(-beta[j-1]));
+                TRY(gen_axpy(bl_handle, n_rows, &scal, (T_cu *)v0_d.ptr, 1, (T_cu *)w_d.ptr, 1));
+                
+                // beta[j] = sqrt(real(w dot w))
+                TRY(gen_dotc(bl_handle, n_rows, (T_cu *)w_d.ptr, 1, (T_cu *)w_d.ptr, 1, &cdot_res));
+                beta[j] = std::sqrt(cuda_real(cdot_res));
+                
+                // v0 = v1;
+                v0_d.from_device(v1_d);
+                
+                // v1 = w / beta[j];
+                v1_d.from_device(w_d);
+                scal = cuda_cast(T(1.0 / beta[j]));
+                TRY(gen_scal(bl_handle, n_rows, &scal, (T_cu *)v1_d.ptr, 1));
             }
             
-            w = A * v1;
-            alpha[iters-1] = std::real(arma::cdot(w, v1));
+            // w = H * v1;
+            TRY(gen_bsrmv(cs_handle, CUSPARSE_DIRECTION_COLUMN, CUSPARSE_OPERATION_NON_TRANSPOSE,
+                          n_rows, n_rows, n_blocks, &one_cu, cs_mat_descr,
+                          (T_cu *)HVal_d.ptr, HRowPtr_d.ptr, HColIndex_d.ptr, b_len,
+                          (T_cu *)v1_d.ptr, &zero_cu, (T_cu *)w_d.ptr));
             
+            // alpha[iters-1] = real(w dot v1)
+            T_cu cdot_res;
+            TRY(gen_dotc(bl_handle, n_rows, (T_cu *)w_d.ptr, 1, (T_cu *)v1_d.ptr, 1, &cdot_res));
+            alpha[iters-1] = cuda_real(cdot_res);
             
+            // Deallocate all CUDA storage
+            v0_d.deallocate();
+            v1_d.deallocate();
+            w_d.deallocate();
+            HRowPtr_d.deallocate();
+            HColIndex_d.deallocate();
+            HVal_d.deallocate();
+            
+            // Find eigenvalues of tridiagonal matrix
             arma::mat tri(iters, iters);
             tri.zeros();
             tri(0, 0) = alpha[0];
@@ -385,6 +440,8 @@ namespace fkpm {
                 tri(j, j) = alpha[j];
             }
             arma::vec evals = arma::eig_sym(tri);
+            
+            // Stretch energy scale by amount "extend" on each side
             double eig_min = *std::min_element(evals.begin(), evals.end());
             double eig_max = *std::max_element(evals.begin(), evals.end());
             double slack = extend * (eig_max - eig_min);

@@ -13,8 +13,8 @@ namespace fkpm {
         arma::Mat<T> a2;
         
         EnergyScale energy_scale(SpMatBsr<T> const& H, double extend, int iters) {
-            arma::SpMat<T> A = H.to_arma();
-            int n = A.n_rows;
+            arma::SpMat<T> Ha = H.to_arma();
+            int n = H.n_rows;
             arma::Col<T> v0(n), v1(n), w(n);
             v0.zeros();
             v1.randn();
@@ -24,7 +24,7 @@ namespace fkpm {
             beta[0] = 0;
             
             for (int j = 1; j < iters; j++) {
-                w = A * v1;
+                w = Ha * v1;
                 alpha[j-1] = std::real(arma::cdot(w, v1));
                 w = w - alpha[j-1] * v1 - beta[j-1] * v0;
                 beta[j] = std::sqrt(std::real(arma::cdot(w, w)));
@@ -32,7 +32,7 @@ namespace fkpm {
                 v1 = w / beta[j];
             }
             
-            w = A * v1;
+            w = Ha * v1;
             alpha[iters-1] = std::real(arma::cdot(w, v1));
             
             

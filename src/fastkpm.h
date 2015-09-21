@@ -189,7 +189,7 @@ namespace fkpm {
         arma::Mat<T> R2;       // Another Random vector for 2nd version of moments calculation
         
         // Lanczos approximaton to eigenvalue span
-        virtual EnergyScale energy_scale(SpMatBsr<T> const& H, double extend, int iters = 20) = 0;
+        virtual EnergyScale energy_scale(SpMatBsr<T> const& H, double extend, int iters = 128) = 0;
         
         // Identity matrix
         virtual void set_R_identity(int n, int j_start, int j_end);
