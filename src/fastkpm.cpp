@@ -14,24 +14,6 @@
 
 namespace fkpm {
     
-    template <typename T>
-    EnergyScale energy_scale(SpMatBsr<T> const& H, double extra, double tolerance) {
-        arma::sp_cx_mat H_a = SpMatBsr<cx_double>(H).to_arma();
-        arma::cx_vec eigval;
-        int num=(H_a.n_rows>500)?10:1;    //use 500:10 for now, fine tune the numbers in the future
-        arma::eigs_gen(eigval, H_a, num, "sr", tolerance);
-        double eig_min = eigval(0).real();
-        arma::eigs_gen(eigval, H_a, num, "lr", tolerance);
-        double eig_max = eigval(0).real();
-        double slack = extra * (eig_max - eig_min);
-        return {eig_min-slack, eig_max+slack};
-    }
-    // TODO: fix and use Armadillo's eigs_sym
-    template EnergyScale energy_scale(SpMatBsr<float> const& H, double extra, double tolerance);
-    template EnergyScale energy_scale(SpMatBsr<double> const& H, double extra, double tolerance);
-    template EnergyScale energy_scale(SpMatBsr<cx_float> const& H, double extra, double tolerance);
-    template EnergyScale energy_scale(SpMatBsr<cx_double> const& H, double extra, double tolerance);
-    
     Vec<double> jackson_kernel(int M) {
         auto ret = Vec<double>(M);
         double Mp = M+1.0;

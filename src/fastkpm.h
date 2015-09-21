@@ -121,10 +121,6 @@ namespace fkpm {
         }
     };
     
-    // Use Lanczos to bound eigenvalues of H, and determine appropriate rescaling
-    template <typename T>
-    EnergyScale energy_scale(SpMatBsr<T> const& H, double extend, double tolerance);
-    
     // Optimally damp Gibbs oscillations in KPM estimates
     Vec<double> jackson_kernel(int M);
     
@@ -191,6 +187,9 @@ namespace fkpm {
     public:
         arma::Mat<T> R;        // Random vectors
         arma::Mat<T> R2;       // Another Random vector for 2nd version of moments calculation
+        
+        // Lanczos approximaton to eigenvalue span
+        virtual EnergyScale energy_scale(SpMatBsr<T> const& H, double extend, int iters = 20) = 0;
         
         // Identity matrix
         virtual void set_R_identity(int n, int j_start, int j_end);

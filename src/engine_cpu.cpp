@@ -12,6 +12,45 @@ namespace fkpm {
         arma::Mat<T> a1;
         arma::Mat<T> a2;
         
+        EnergyScale energy_scale(SpMatBsr<T> const& H, double extend, int iters) {
+            arma::SpMat<T> A = H.to_arma();
+            int n = A.n_rows;
+            arma::Col<T> v0(n), v1(n), w(n);
+            v0.zeros();
+            v1.randn();
+            v1 /= std::sqrt(std::real(arma::cdot(v1, v1)));
+            
+            Vec<double> alpha(iters), beta(iters);
+            beta[0] = 0;
+            
+            for (int j = 1; j < iters; j++) {
+                w = A * v1;
+                alpha[j-1] = std::real(arma::cdot(w, v1));
+                w = w - alpha[j-1] * v1 - beta[j-1] * v0;
+                beta[j] = std::sqrt(std::real(arma::cdot(w, w)));
+                v0 = v1;
+                v1 = w / beta[j];
+            }
+            
+            w = A * v1;
+            alpha[iters-1] = std::real(arma::cdot(w, v1));
+            
+            
+            arma::mat tri(iters, iters);
+            tri.zeros();
+            tri(0, 0) = alpha[0];
+            for (int j = 1; j < iters; j++) {
+                tri(j, j-1) = beta[j];
+                tri(j-1, j) = beta[j];
+                tri(j, j) = alpha[j];
+            }
+            arma::vec evals = arma::eig_sym(tri);
+            double eig_min = *std::min_element(evals.begin(), evals.end());
+            double eig_max = *std::max_element(evals.begin(), evals.end());
+            double slack = extend * (eig_max - eig_min);
+            return {eig_min-slack, eig_max+slack};
+        }
+        
         void set_H(SpMatBsr<T> const& H, EnergyScale const& es) {
             assert(H.n_rows == H.n_cols);
             this->es = es;

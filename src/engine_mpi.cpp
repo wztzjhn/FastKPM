@@ -208,6 +208,11 @@ namespace fkpm {
             MPI_Finalize();
         }
         
+        // Lanczos approximaton to eigenvalue span
+        EnergyScale energy_scale(SpMatBsr<T> const& H, double extend, int iters) {
+            return worker->energy_scale(H, extend, iters);
+        }
+        
         void broadcast_cmd(Tag tag) {
             Cmd cmd = { tag, static_cast<int>(ser.buffer.size()) };
             MPI_Bcast(&cmd, 2, MPI_INT, root_rank, MPI_COMM_WORLD);
