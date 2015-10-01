@@ -927,10 +927,18 @@ namespace fkpm {
         
         Vec<Vec<cx_double>> moments2_v1(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op,
                                         int a_chunk_ncols=-1, int R_chunk_ncols=-1) {
-            if (n_threads > 1) {
-                std::cerr << "Threaded moments2_v1 not yet implemented!\n";
+            Vec<Vec<Vec<cx_double>>> mus(n_threads);
+            run_workers([&](int t) {
+                mus[t] = workers[t]->moments2_v1(M, j1op, j2op, a_chunk_ncols, R_chunk_ncols);
+            });
+            for (int t = 1; t < n_threads; t++) {
+                for (int m1 = 0; m1 < M; m1++) {
+                    for (int m2 = 0; m2 < M; m2++) {
+                        mus[0][m1][m2] += mus[t][m1][m2];
+                    }
+                }
             }
-            return workers[0]->moments2_v1(M, j1op, j2op, a_chunk_ncols, R_chunk_ncols);
+            return mus[0];
         }
         
         Vec<Vec<cx_double>> moments2_v2(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op, int a_chunk_ncols=-1) {
