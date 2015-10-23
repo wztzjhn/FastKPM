@@ -386,14 +386,16 @@ namespace fkpm {
     double filling_to_mu(Vec<double> const& gamma, EnergyScale const& es, double kT, double filling, double delta_filling) {
         // thermal smearing for faster convergence
         kT = std::max(kT, 0.1*es.mag()/gamma.size());
+        double c = kT * std::log(1.0/filling - 1.0);
 
         auto f1 = [&](double x) { return mu_to_filling(gamma, es, kT, x) - (filling+delta_filling); };
         auto f2 = [&](double x) { return mu_to_filling(gamma, es, kT, x) - (filling-delta_filling); };
         if (delta_filling == 0) {
-            return root_solver(f1, es.lo, es.hi);
+            return root_solver(f1, es.lo - std::max(c,0.0), es.hi + std::max(-c,0.0));
         }
         else {
-            return 0.5 * (root_solver(f1, es.lo, es.hi) + root_solver(f2, es.lo, es.hi));
+            return 0.5 * (root_solver(f1, es.lo - std::max(c,0.0), es.hi + std::max(-c,0.0))
+                        + root_solver(f2, es.lo - std::max(c,0.0), es.hi + std::max(-c,0.0)));
         }
     }
     double filling_to_mu(arma::vec const& evals, double kT, double filling) {
