@@ -97,9 +97,8 @@ namespace fkpm {
             auto j2 = j2op.to_arma();
             int n = this->R.n_rows;
 
-            if (a_chunk_ncols < 0)
-                a_chunk_ncols = 10;
-            assert(a_chunk_ncols >= 3 && a_chunk_ncols <= M);
+            if (a_chunk_ncols < 3) a_chunk_ncols = 10;
+            if (a_chunk_ncols > M) a_chunk_ncols = M;
             
             assert(Hs.n_rows == n && Hs.n_cols == n);
             assert(j1.n_rows == n && j1.n_cols == n);
