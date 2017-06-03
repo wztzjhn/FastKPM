@@ -44,22 +44,29 @@ namespace fkpm {
     }
     
     Vec<double> expansion_coefficients(int M, int Mq, std::function<double(double)> f, EnergyScale es) {
-        // TODO: replace with DCT-II, f -> fp (caution, double check FFTW docs)
-        auto fp = Vec<double>(M, 0.0);   // previously size of fp is Mq, is it a bug?
-        auto T = Vec<double>(M);
+        assert(Mq >= 2*M);                 // to be able to use FFT
+        auto ret = Vec<double>(M, 0.0);    // initialize to zero
+        
+        double *xc, *yc;
+        xc = (double*) fftw_malloc(sizeof(double) * Mq);
+        yc = (double*) fftw_malloc(sizeof(double) * Mq);
         for (int i = 0; i < Mq; i++) {
             double x_i = cos(Pi * (i+0.5) / Mq);
-            double f_i = f(es.unscale(x_i));
-            chebyshev_fill_array(x_i, T);
-            for (int m = 0; m < M; m++) {
-                fp[m] += f_i * T[m];
-            }
+            xc[i] = f(es.unscale(x_i));
         }
+        
+        fftw_plan p;
+        p = fftw_plan_r2r_1d(Mq, xc, yc, FFTW_REDFT10, FFTW_ESTIMATE);  // DCT-II
+        fftw_execute(p);
+        fftw_destroy_plan(p);
+        
         auto kernel = jackson_kernel(M);
-        auto ret = Vec<double>(M);
         for (int m = 0; m < M; m++) {
-            ret[m] = (m == 0 ? 1.0 : 2.0) * kernel[m] * fp[m] / Mq;
+            ret[m] = (m == 0 ? 0.5 : 1.0) * kernel[m] * yc[m] / Mq;
         }
+        
+        fftw_free(xc);
+        fftw_free(yc);
         return ret;
     }
     
