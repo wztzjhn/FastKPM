@@ -9,7 +9,11 @@
 #include <cassert>
 #include <algorithm>
 #include <boost/math/tools/roots.hpp>
+
+#ifdef WITH_FFTW
 #include <fftw3.h>
+#endif
+
 #include "fastkpm.h"
 
 
@@ -70,43 +74,86 @@ namespace fkpm {
         return ret;
     }
     
-    // notice: for x_i which is too close to -1 or 1, f(x) may be ill defined
-    //         and thus causing numerical errors, so we should remove a few points near -1 & 1
+    
     Vec<Vec<cx_double>> electrical_conductivity_coefficients(int M, int Mq, double kT, double mu,
                                                              double omega, EnergyScale es, Vec<double> const& kernel) {
-        // TODO: replace with fftw
         assert(kernel.size() == M);
+        assert(Mq >= 2*M);                                                      // To simplify usage of Y_{m_1+m_2} (see notes on fft)
         assert(omega >= 0.0);
-        int n_neglect = 5;                              // neglect points near the boundary
-        double omega_scaled = omega / es.mag();         // rescale omega
+        double cutoff = 1e-4;                                                   // neglect points near the boundary
+        double omega_scaled = omega / es.mag();                                 // rescale omega
         Vec<Vec<cx_double>> ret(M);
-        for (int i = 0; i < M; i++) {                   // initialize cmn to 0
+        for (int i = 0; i < M; i++) {                                           // initialize cmn to 0
             ret[i].resize(M, 0.0);
         }
         if (omega_scaled >= 2.0 ) return ret;
-        int i_start = (omega_scaled > 1e-7) ? std::ceil(acos(1.0 - omega_scaled) / Pi * Mq - 0.5) : n_neglect;
-        if (i_start < n_neglect) std::cout << "Warning: Need larger Mq!" << std::endl;
-        auto T_i = Vec<double>(M);
-        auto T_j = Vec<double>(M);
+        //int i_start = (omega_scaled > 1e-7) ? std::ceil(acos(1.0 - omega_scaled) / Pi * Mq - 0.5) : n_neglect;
         
-        for (int i = i_start; i < Mq - n_neglect; i++) {
-            double x_i = cos(Pi * (i+0.5) / Mq);
-            double temp_squareroot1 = std::sqrt(1.0-x_i*x_i);
-            double temp_squareroot2 = std::sqrt(1.0 - (x_i + omega_scaled) * (x_i + omega_scaled));
-            double f_i;
-            if (omega_scaled > 1e-7) {
-                chebyshev_fill_array(x_i + omega_scaled, T_i);
-                chebyshev_fill_array(x_i, T_j);           // fill T_j with cos[m * arccos(x)]
-                f_i = (fermi_density(es.unscale(x_i), kT, mu) - fermi_density(es.unscale(x_i) + omega, kT, mu))
-                     / (omega * temp_squareroot2);
-                for (int m1 = 0; m1 < M; m1++) {
-                    for (int m2 = 0; m2 < M; m2++) {
-                        ret[m1][m2] += T_i[m1] * T_j[m2] * f_i;
-                    }
+        if (omega_scaled < 1e-10) {                                             // static conductivity
+#ifdef WITH_FFTW
+            double *x1, *x2, *yc1, *yc2, *ys1, *ys2;
+            fftw_plan p1, p2, p3, p4;
+            x1  = (double*) fftw_malloc(sizeof(double) * Mq);
+            x2  = (double*) fftw_malloc(sizeof(double) * Mq);
+            yc1 = (double*) fftw_malloc(sizeof(double) * Mq);
+            yc2 = (double*) fftw_malloc(sizeof(double) * Mq);
+            ys1 = (double*) fftw_malloc(sizeof(double) * Mq);
+            ys2 = (double*) fftw_malloc(sizeof(double) * Mq);
+            for (int i = 0; i < Mq; i++) {
+                double x_i = cos(Pi * (i+0.5) / Mq);
+                if (1.0-x_i*x_i < cutoff) {                                     // neglect points near boundary
+                    x1[i] = 0.0;
+                    x2[i] = 0.0;
+                } else {
+                    double f_i = fermi_density(es.unscale(x_i), kT, mu);
+                    x1[i] = f_i * x_i / std::pow(1.0-x_i*x_i, 1.5);
+                    x2[i] = f_i / (1.0-x_i*x_i);
                 }
-            } else {
+            }
+            p1  = fftw_plan_r2r_1d(Mq, x1, yc1, FFTW_REDFT10, FFTW_ESTIMATE);   // DCT-II
+            fftw_execute(p1);
+            p2  = fftw_plan_r2r_1d(Mq, x2, yc2, FFTW_REDFT10, FFTW_ESTIMATE);   // DCT-II
+            fftw_execute(p2);
+            p3  = fftw_plan_r2r_1d(Mq, x1, ys1, FFTW_RODFT10, FFTW_ESTIMATE);   // DST-II
+            fftw_execute(p3);
+            p4  = fftw_plan_r2r_1d(Mq, x2, ys2, FFTW_RODFT10, FFTW_ESTIMATE);   // DST-II
+            fftw_execute(p4);
+            fftw_destroy_plan(p1);
+            fftw_destroy_plan(p2);
+            fftw_destroy_plan(p3);
+            fftw_destroy_plan(p4);
+            fftw_free(x1);
+            fftw_free(x2);
+            for (int m1 = 0; m1 < M; m1++) {
+                double temp_m1 = Pi * (m1 == 0 ? 1.0 : 2.0) * kernel[m1] / (2.0 * Mq * es.mag() * es.mag());
+                for (int m2 = 0; m2 < M; m2++) {
+                    double temp_m2 = temp_m1 * (m2 == 0 ? 1.0 : 2.0) * kernel[m2];
+                    int m_sum   = m1 + m2;
+                    int m_dif   = m1 - m2;
+                    double y_re =  2.0 * yc1[m_sum]
+                                 + 2.0 * (m_dif >= 0 ? yc1[m_dif] : yc1[-m_dif])
+                                 + m_sum * (m_sum > 0 ? ys2[m_sum-1] : 0.0)
+                                 + m_dif * (m_dif > 0 ? ys2[m_dif-1] : (m_dif < 0 ? -ys2[-m_dif-1] : 0.0));
+                    double y_im =  2.0 * (m_dif > 0 ? ys1[m_dif-1] : (m_dif < 0 ? -ys1[-m_dif-1] : 0.0))
+                                 - m_dif * (yc2[m_sum] + (m_dif >=0 ? yc2[m_dif] : yc2[-m_dif]));
+                    ret[m1][m2] = cx_double(temp_m2 * y_re, temp_m2 * y_im);
+                }
+            }
+            fftw_free(yc1);
+            fftw_free(yc2);
+            fftw_free(ys1);
+            fftw_free(ys2);
+#else
+            std::cout << "Warning: Not using FFTW." << std::endl;
+            auto T_i = Vec<double>(M);
+            auto T_j = Vec<double>(M);
+            for (int i = 0; i < Mq; i++) {
+                double x_i = cos(Pi * (i+0.5) / Mq);
+                if (1.0-x_i*x_i < cutoff) continue;                             // neglect points near boundary
+                double temp_squareroot1 = std::sqrt(1.0-x_i*x_i);
+                double f_i;
                 chebyshev_fill_array(x_i, T_i);
-                chebyshev_fill_array(x_i, T_j, 2);        // fill T_j with sin[m * arccos(x)]
+                chebyshev_fill_array(x_i, T_j, 2);                              // fill T_j with sin[m * arccos(x)]
                 for (int m = M-1; m > 0; m--) {
                     T_j[m] = T_j[m-1] * temp_squareroot1;
                 }
@@ -121,89 +168,44 @@ namespace fkpm {
                     }
                 }
             }
-        }
-        for (int m1 = 0; m1 < M; m1++) {
-            double temp_m1 = 2.0 * Pi * (m1 == 0 ? 1.0 : 2.0) * kernel[m1] / (Mq * es.mag() * es.mag());
-            for (int m2 = 0; m2 < M; m2++) {
-                double temp_m2 = temp_m1 * (m2 == 0 ? 1.0 : 2.0) * kernel[m2];
-                ret[m1][m2] *= cx_double(temp_m2, 0.0);
+            for (int m1 = 0; m1 < M; m1++) {
+                double temp_m1 = 2.0 * Pi * (m1 == 0 ? 1.0 : 2.0) * kernel[m1] / (Mq * es.mag() * es.mag());
+                for (int m2 = 0; m2 < M; m2++) {
+                    double temp_m2 = temp_m1 * (m2 == 0 ? 1.0 : 2.0) * kernel[m2];
+                    ret[m1][m2] *= cx_double(temp_m2, 0.0);
+                }
             }
-        }
-        return ret;
-    }
-    
-    Vec<Vec<cx_double>> electrical_conductivity_coefficients_v2(int M, int Mq, double kT, double mu,
-                                                             double omega, EnergyScale es, Vec<double> const& kernel) {
-        assert(kernel.size() == M);
-        assert(Mq >= 2*M);                              // To simplify usage of Y_{m_1+m_2} (see notes on fft)
-        assert(omega >= 0.0);
-        double cutoff = 1e-4;                           // neglect points near the boundary
-        double omega_scaled = omega / es.mag();         // rescale omega
-        Vec<Vec<cx_double>> ret(M);
-        for (int i = 0; i < M; i++) {                   // initialize cmn to 0
-            ret[i].resize(M, 0.0);
-        }
-        if (omega_scaled >= 2.0 ) return ret;
-        //int i_start = (omega_scaled > 1e-7) ? std::ceil(acos(1.0 - omega_scaled) / Pi * Mq - 0.5) : n_neglect;
-        //if (i_start < n_neglect) std::cout << "Warning: Need larger Mq!" << std::endl;
-        if (omega_scaled>1e-7) {
-            std::cerr << "fft not implemented for finite omega yet, please use old version!\n";
-            std::exit(EXIT_FAILURE);
-        }
-        
-        double *x1, *x2, *yc1, *yc2, *ys1, *ys2;
-        fftw_plan p1, p2, p3, p4;
-        x1  = (double*) fftw_malloc(sizeof(double) * Mq);
-        x2  = (double*) fftw_malloc(sizeof(double) * Mq);
-        yc1 = (double*) fftw_malloc(sizeof(double) * Mq);
-        yc2 = (double*) fftw_malloc(sizeof(double) * Mq);
-        ys1 = (double*) fftw_malloc(sizeof(double) * Mq);
-        ys2 = (double*) fftw_malloc(sizeof(double) * Mq);
-        for (int i = 0; i < Mq; i++) {
-            double x_i = cos(Pi * (i+0.5) / Mq);
-            if (1.0-x_i*x_i < cutoff) {
-                x1[i] = 0.0;
-                x2[i] = 0.0;
-            } else {
-                double f_i = fermi_density(es.unscale(x_i), kT, mu);
-                x1[i] = f_i * x_i / std::pow(1.0-x_i*x_i, 1.5);
-                x2[i] = f_i / (1.0-x_i*x_i);
+#endif
+        } else {                                                                // optical conductivity
+            std::cout << "Warning: FFTW not implemented yet." << std::endl;
+            int i_start = std::ceil(acos(1.0 - omega_scaled) / Pi * Mq - 0.5);
+            assert(M - i_start >= 20);                                          // at least 20 points to do integration
+            auto T_i = Vec<double>(M);
+            auto T_j = Vec<double>(M);
+            for (int i = i_start; i < Mq; i++) {
+                double x_i = cos(Pi * (i+0.5) / Mq);
+                if (1.0-x_i*x_i < cutoff) continue;                             // neglect points near boundary
+                double temp_squareroot2 = std::sqrt(1.0 - (x_i + omega_scaled) * (x_i + omega_scaled));
+                double f_i;
+                chebyshev_fill_array(x_i + omega_scaled, T_i);
+                chebyshev_fill_array(x_i, T_j);           // fill T_j with cos[m * arccos(x)]
+                f_i = (fermi_density(es.unscale(x_i), kT, mu) - fermi_density(es.unscale(x_i) + omega, kT, mu))
+                     / (omega * temp_squareroot2);
+                for (int m1 = 0; m1 < M; m1++) {
+                    for (int m2 = 0; m2 < M; m2++) {
+                        ret[m1][m2] += T_i[m1] * T_j[m2] * f_i;
+                    }
+                }
             }
-        }
-        p1  = fftw_plan_r2r_1d(Mq, x1, yc1, FFTW_REDFT10, FFTW_ESTIMATE);  // DCT-II
-        fftw_execute(p1);
-        p2  = fftw_plan_r2r_1d(Mq, x2, yc2, FFTW_REDFT10, FFTW_ESTIMATE);  // DCT-II
-        fftw_execute(p2);
-        p3  = fftw_plan_r2r_1d(Mq, x1, ys1, FFTW_RODFT10, FFTW_ESTIMATE);  // DST-II
-        fftw_execute(p3);
-        p4  = fftw_plan_r2r_1d(Mq, x2, ys2, FFTW_RODFT10, FFTW_ESTIMATE);  // DST-II
-        fftw_execute(p4);
-        fftw_destroy_plan(p1);
-        fftw_destroy_plan(p2);
-        fftw_destroy_plan(p3);
-        fftw_destroy_plan(p4);
-        fftw_free(x1);
-        fftw_free(x2);
-        
-        for (int m1 = 0; m1 < M; m1++) {
-            double temp_m1 = Pi * (m1 == 0 ? 1.0 : 2.0) * kernel[m1] / (2.0 * Mq * es.mag() * es.mag());
-            for (int m2 = 0; m2 < M; m2++) {
-                double temp_m2 = temp_m1 * (m2 == 0 ? 1.0 : 2.0) * kernel[m2];
-                int m_sum   = m1 + m2;
-                int m_dif   = m1 - m2;
-                double y_re =  2.0 * yc1[m_sum]
-                             + 2.0 * (m_dif >= 0 ? yc1[m_dif] : yc1[-m_dif])
-                             + m_sum * (m_sum > 0 ? ys2[m_sum-1] : 0.0)
-                             + m_dif * (m_dif > 0 ? ys2[m_dif-1] : (m_dif < 0 ? -ys2[-m_dif-1] : 0.0));
-                double y_im =  2.0 * (m_dif > 0 ? ys1[m_dif-1] : (m_dif < 0 ? -ys1[-m_dif-1] : 0.0))
-                             - m_dif * (yc2[m_sum] + (m_dif >=0 ? yc2[m_dif] : yc2[-m_dif]));
-                ret[m1][m2] = cx_double(temp_m2 * y_re, temp_m2 * y_im);
+            for (int m1 = 0; m1 < M; m1++) {
+                double temp_m1 = 2.0 * Pi * (m1 == 0 ? 1.0 : 2.0) * kernel[m1] / (Mq * es.mag() * es.mag());
+                for (int m2 = 0; m2 < M; m2++) {
+                    double temp_m2 = temp_m1 * (m2 == 0 ? 1.0 : 2.0) * kernel[m2];
+                    ret[m1][m2] *= cx_double(temp_m2, 0.0);
+                }
             }
+            
         }
-        fftw_free(yc1);
-        fftw_free(yc2);
-        fftw_free(ys1);
-        fftw_free(ys2);
         return ret;
     }
 
