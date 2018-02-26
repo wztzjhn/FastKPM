@@ -603,7 +603,7 @@ namespace fkpm {
             assert(j2op.n_rows == n && j2op.n_cols == n);
             assert(M % 2 == 0);
             if (a_chunk_ncols < 3) a_chunk_ncols = 10;
-            if (R_chunk_ncols < 1) R_chunk_ncols = 64;
+            if (R_chunk_ncols < 1) R_chunk_ncols = 16;
             if (a_chunk_ncols > M) a_chunk_ncols = M;
             if (R_chunk_ncols > this->R.n_cols) R_chunk_ncols = this->R.n_cols;
 
@@ -926,7 +926,7 @@ namespace fkpm {
         }
         
         Vec<Vec<cx_double>> moments2_v1(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op,
-                                        int a_chunk_ncols=-1, int R_chunk_ncols=-1) {
+                                        int a_chunk_ncols=0, int R_chunk_ncols=0) {
             Vec<Vec<Vec<cx_double>>> mus(n_threads);
             run_workers([&](int t) {
                 mus[t] = workers[t]->moments2_v1(M, j1op, j2op, a_chunk_ncols, R_chunk_ncols);
@@ -941,7 +941,7 @@ namespace fkpm {
             return mus[0];
         }
         
-        Vec<Vec<cx_double>> moments2_v2(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op, int a_chunk_ncols=-1) {
+        Vec<Vec<cx_double>> moments2_v2(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op, int a_chunk_ncols=0) {
             if (n_threads > 1) {
                 std::cerr << "Threaded moments2_v2 not yet implemented!\n";
             }

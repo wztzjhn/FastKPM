@@ -214,9 +214,9 @@ namespace fkpm {
         
         // Chebyshev moments: mu_{m1,m2} = tr( j1 T_{m1}(Hs) j2 T_{m2}(Hs) )
         virtual Vec<Vec<cx_double>> moments2_v1(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op,
-                                                int a_chunk_ncols=-1, int R_chunk_ncols=-1) = 0;
+                                                int a_chunk_ncols=0, int R_chunk_ncols=0) = 0;
         virtual Vec<Vec<cx_double>> moments2_v2(int M, SpMatBsr<T> const& j1op,
-                                                   SpMatBsr<T> const& j2op, int a_chunk_ncols=-1) = 0;
+                                                   SpMatBsr<T> const& j2op, int a_chunk_ncols=0) = 0;
         
         // Approximates D ~ (xi R^\dagger + R xi^\dagger)/2 where xi = D R
         // and D ~ (\sum_m c_m T_m(Hs))R
