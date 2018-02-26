@@ -48,9 +48,10 @@ namespace fkpm {
     }
     
     Vec<double> expansion_coefficients(int M, int Mq, std::function<double(double)> f, EnergyScale es) {
-        assert(Mq >= 2*M);                 // to be able to use FFT
-        auto ret = Vec<double>(M, 0.0);    // initialize to zero
-        
+        assert(Mq >= M);
+        auto kernel = jackson_kernel(M);
+        auto ret = Vec<double>(M, 0.0);
+#ifdef WITH_FFTW
         double *xc, *yc;
         xc = (double*) fftw_malloc(sizeof(double) * Mq);
         yc = (double*) fftw_malloc(sizeof(double) * Mq);
@@ -58,22 +59,33 @@ namespace fkpm {
             double x_i = cos(Pi * (i+0.5) / Mq);
             xc[i] = f(es.unscale(x_i));
         }
-        
         fftw_plan p;
         p = fftw_plan_r2r_1d(Mq, xc, yc, FFTW_REDFT10, FFTW_ESTIMATE);  // DCT-II
         fftw_execute(p);
         fftw_destroy_plan(p);
-        
-        auto kernel = jackson_kernel(M);
         for (int m = 0; m < M; m++) {
             ret[m] = (m == 0 ? 0.5 : 1.0) * kernel[m] * yc[m] / Mq;
         }
-        
         fftw_free(xc);
         fftw_free(yc);
+#else
+        std::cout << "Warning: Not using FFTW (expansion_coefficients)." << std::endl;
+        auto fp = Vec<double>(M, 0.0);
+        auto T = Vec<double>(M);
+        for (int i = 0; i < Mq; i++) {
+            double x_i = cos(Pi * (i+0.5) / Mq);
+            double f_i = f(es.unscale(x_i));
+            chebyshev_fill_array(x_i, T);
+            for (int m = 0; m < M; m++) {
+                fp[m] += f_i * T[m];
+            }
+        }
+        for (int m = 0; m < M; m++) {
+            ret[m] = (m == 0 ? 1.0 : 2.0) * kernel[m] * fp[m] / Mq;
+        }
+#endif
         return ret;
     }
-    
     
     Vec<Vec<cx_double>> electrical_conductivity_coefficients(int M, int Mq, double kT, double mu,
                                                              double omega, EnergyScale es, Vec<double> const& kernel) {
@@ -87,7 +99,6 @@ namespace fkpm {
             ret[i].resize(M, 0.0);
         }
         if (omega_scaled >= 2.0 ) return ret;
-        //int i_start = (omega_scaled > 1e-7) ? std::ceil(acos(1.0 - omega_scaled) / Pi * Mq - 0.5) : n_neglect;
         
         if (omega_scaled < 1e-10) {                                             // static conductivity
 #ifdef WITH_FFTW
@@ -144,7 +155,7 @@ namespace fkpm {
             fftw_free(ys1);
             fftw_free(ys2);
 #else
-            std::cout << "Warning: Not using FFTW." << std::endl;
+            std::cout << "Warning: Not using FFTW (electrical_conductivity_coefficients)." << std::endl;
             auto T_i = Vec<double>(M);
             auto T_j = Vec<double>(M);
             for (int i = 0; i < Mq; i++) {
@@ -177,7 +188,7 @@ namespace fkpm {
             }
 #endif
         } else {                                                                // optical conductivity
-            std::cout << "Warning: FFTW not implemented yet." << std::endl;
+            std::cout << "Warning: FFTW not implemented yet (electrical_conductivity_coefficients)." << std::endl;
             int i_start = std::ceil(acos(1.0 - omega_scaled) / Pi * Mq - 0.5);
             assert(M - i_start >= 20);                                          // at least 20 points to do integration
             auto T_i = Vec<double>(M);
