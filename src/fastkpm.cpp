@@ -1,10 +1,4 @@
-//
-//  fastkpm.cpp
-//  tibidy
-//
-//  Created by Kipton Barros on 5/22/14.
-//
-//
+#include "fastkpm.h"
 
 #include <cassert>
 #include <algorithm>
@@ -13,9 +7,6 @@
 #ifdef WITH_FFTW
 #include <fftw3.h>
 #endif
-
-#include "fastkpm.h"
-
 
 namespace fkpm {
     
@@ -69,7 +60,6 @@ namespace fkpm {
         fftw_free(xc);
         fftw_free(yc);
 #else
-        std::cout << "Warning: Not using FFTW (expansion_coefficients)." << std::endl;
         auto fp = Vec<double>(M, 0.0);
         auto T = Vec<double>(M);
         for (int i = 0; i < Mq; i++) {
@@ -233,7 +223,7 @@ namespace fkpm {
         
         // TODO: replace with DCT-III, mup -> gamma (caution, double check FFTW docs)
         for (int i = 0; i < Mq; i++) {
-            gamma[i] = 0.0;     // add this line in case some compilers initialize gamma with arbitrary number
+            gamma[i] = 0.0;
             double x_i = cos(Pi * (i+0.5) / Mq);
             chebyshev_fill_array(x_i, T); // T_m(x_i) = cos(m pi (i+1/2) / Mq)
             for (int m = 0; m < M; m++) {

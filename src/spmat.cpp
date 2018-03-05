@@ -1,6 +1,7 @@
+#include "fastkpm.h"
+
 #include <armadillo>
 #include <cassert>
-#include "fastkpm.h"
 
 namespace fkpm {
     

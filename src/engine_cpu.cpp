@@ -1,7 +1,6 @@
-#include <cassert>
-
 #include "fastkpm.h"
 
+#include <cassert>
 
 namespace fkpm {
     template <typename T>

@@ -1,11 +1,3 @@
-//
-//  timer.cpp
-//  tibidy
-//
-//  Created by Kipton Barros on 8/1/14.
-//
-//
-
 #include "fastkpm.h"
 
 namespace fkpm {
