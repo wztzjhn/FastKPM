@@ -68,3 +68,8 @@ pages = {094107},
 year = {2018},
 }
 ```
+
+Authors
+-------
+
+The primary authors are [Kipton Barros](https://cnls.lanl.gov/~kbarros) (LANL) and [Zhentao Wang](https://scholar.google.com/citations?user=P3InF50AAAAJ&hl=en) (UTK). 
