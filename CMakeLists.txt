@@ -75,7 +75,7 @@ if (CUDA_FOUND)
     # With recent versions of Xcode, must explicitly use clang
     set(CUDA_HOST_COMPILER /usr/bin/clang)
   endif()
-  set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-O2;
+  set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-O2;-Xcompiler=-fPIC;
     -gencode=arch=compute_30,code=sm_30;
     -gencode=arch=compute_35,code=sm_35;
     -gencode=arch=compute_50,code=sm_50)

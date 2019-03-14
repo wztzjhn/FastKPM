@@ -9,11 +9,13 @@ ELSE(FFTW_INCLUDE_DIRS)
     SET(TRIAL_PATHS
       /opt/fftw-3.2/usr/include
       /usr/include
+      $ENV{FFTW_INC}
     )
     SET(TRIAL_LIBRARY_PATHS
       /opt/fftw-3.2/usr/lib64
       /usr/lib
       /usr/lib64
+      $ENV{FFTW_DIR}
       )
     FIND_PATH(FFTW_INCLUDE_DIR fftw3.h ${TRIAL_PATHS})
     FIND_LIBRARY(FFTW_LIBRARY fftw3 ${TRIAL_LIBRARY_PATHS})
