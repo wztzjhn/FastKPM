@@ -83,8 +83,7 @@ if (CUDA_FOUND)
 endif()
 
 # Armadillo
-find_package(Armadillo REQUIRED CONFIG
-             PATHS "/usr/local" "$ENV{ARMA_ROOT}" NO_SYSTEM_ENVIRONMENT_PATH)
+find_package(Armadillo REQUIRED)
 include_directories(SYSTEM ${ARMADILLO_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${ARMADILLO_LIBRARIES})
 
