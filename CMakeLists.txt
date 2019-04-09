@@ -78,7 +78,9 @@ if (CUDA_FOUND)
   set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-O2;-Xcompiler=-fPIC;
     -gencode=arch=compute_30,code=sm_30;
     -gencode=arch=compute_35,code=sm_35;
-    -gencode=arch=compute_50,code=sm_50)
+    -gencode=arch=compute_50,code=sm_50;
+    -gencode=arch=compute_61,code=sm_61;
+    -gencode=arch=compute_70,code=sm_70)
   set(CUDA_PROPAGATE_HOST_FLAGS OFF)
 endif()
 
