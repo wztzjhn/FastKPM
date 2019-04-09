@@ -159,7 +159,8 @@ namespace fkpm {
             return mu;
         }
         
-        Vec<Vec<cx_double>> moments2_v2(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op, int a_chunk_ncols) {
+        Vec<Vec<cx_double>> moments2_v2(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op,
+                                        int a_chunk_ncols, int R_chunk_ncols) {
             Vec<arma::Mat<T>> A(M), B(M);
             int n = this->R.n_rows;
             int s = this->R.n_cols;

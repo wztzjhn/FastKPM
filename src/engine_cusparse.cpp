@@ -711,7 +711,8 @@ namespace fkpm {
             return mu;
         }
         
-        Vec<Vec<cx_double>> moments2_v2(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op, int a_chunk_ncols) {
+        Vec<Vec<cx_double>> moments2_v2(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op,
+                                        int a_chunk_ncols, int R_chunk_ncols) {
             std::cerr << "moments2_v2 unimplemented on GPU\n";
             std::exit(EXIT_FAILURE);
         }
@@ -941,11 +942,12 @@ namespace fkpm {
             return mus[0];
         }
         
-        Vec<Vec<cx_double>> moments2_v2(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op, int a_chunk_ncols=0) {
+        Vec<Vec<cx_double>> moments2_v2(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op,
+                                        int a_chunk_ncols=0, int R_chunk_ncols=0) {
             if (n_threads > 1) {
                 std::cerr << "Threaded moments2_v2 not yet implemented!\n";
             }
-            return workers[0]->moments2_v2(M, j1op, j2op, a_chunk_ncols);
+            return workers[0]->moments2_v2(M, j1op, j2op, a_chunk_ncols, R_chunk_ncols);
         }
         
         void stoch_matrix(Vec<double> const& c, SpMatBsr<T>& D) {
