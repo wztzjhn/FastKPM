@@ -303,32 +303,52 @@ namespace fkpm {
         }
         
         void exec_moments2_v1() {
-            int M, a_chunk_ncols;
+            int M, a_chunk_ncols, R_chunk_ncols;
             SpMatBsr<T> j1op, j2op;
-            des >> M >> j1op >> j2op >> a_chunk_ncols;
-            Vec<Vec<cx_double>> mu = worker->moments2_v1(M, j1op, j2op, a_chunk_ncols);
-            assert(false && "Convert mu to matrix and implement reduce-sum");
-            ser << mu;
+            des >> M >> j1op >> j2op >> a_chunk_ncols >> R_chunk_ncols;
+            Vec<Vec<cx_double>> mu = worker->moments2_v1(M, j1op, j2op, a_chunk_ncols, R_chunk_ncols);
+            Vec<Vec<cx_double>> reduced(M);
+            assert(M == mu.size());
+
+            // convert to real numbers, to use MPI_Reduce
+            Vec<double> mu_real(M*M), mu_imag(M*M);
+            Vec<double> reduced_real(M*M), reduced_imag(M*M);
+            for (int m1 = 0; m1 < M; m1++) {
+                for (int m2 = 0; m2 < M; m2++) {
+                    mu_real[m2+m1*M] = std::real(mu[m1][m2]);
+                    mu_imag[m2+m1*M] = std::imag(mu[m1][m2]);
+                }
+            }
+            MPI_Reduce(mu_real.data(), reduced_real.data(), mu_real.size(), MPI_DOUBLE, MPI_SUM, root_rank, MPI_COMM_WORLD);
+            MPI_Reduce(mu_imag.data(), reduced_imag.data(), mu_imag.size(), MPI_DOUBLE, MPI_SUM, root_rank, MPI_COMM_WORLD);
+            for (int m1 = 0; m1 < M; m1++) {
+                reduced[m1].resize(M);
+                for (int m2 = 0; m2 < M; m2++) {
+                    reduced[m1][m2] = cx_double(reduced_real[m2+m1*M], reduced_imag[m2+m1*M]);
+                }
+            }
+            ser << reduced;
         }
         Vec<Vec<cx_double>> moments2_v1(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op,
-                                        int a_chunk_ncols=-1, int R_chunk_ncols=-1) {
+                                        int a_chunk_ncols=0, int R_chunk_ncols=0) {
             ser.reset();
-            ser << M << j1op << j2op << a_chunk_ncols;
+            ser << M << j1op << j2op << a_chunk_ncols << R_chunk_ncols;
             broadcast_cmd(tag_moments2_v1);
             return des.take<Vec<Vec<cx_double>>>();
         }
         
         void exec_moments2_v2() {
-            int M, a_chunk_ncols;
+            int M, a_chunk_ncols, R_chunk_ncols;
             SpMatBsr<T> j1op, j2op;
-            des >> M >> j1op >> j2op >> a_chunk_ncols;
-            Vec<Vec<cx_double>> mu = worker->moments2_v2(M, j1op, j2op, a_chunk_ncols);
+            des >> M >> j1op >> j2op >> a_chunk_ncols >> R_chunk_ncols;
+            Vec<Vec<cx_double>> mu = worker->moments2_v2(M, j1op, j2op, a_chunk_ncols, R_chunk_ncols);
             assert(false && "Convert mu to matrix and implement reduce-sum");
             ser << mu;
         }
-        Vec<Vec<cx_double>> moments2_v2(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op, int a_chunk_ncols=-1) {
+        Vec<Vec<cx_double>> moments2_v2(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op,
+                                        int a_chunk_ncols=0, int R_chunk_ncols=0) {
             ser.reset();
-            ser << M << j1op << j2op << a_chunk_ncols;
+            ser << M << j1op << j2op << a_chunk_ncols << R_chunk_ncols;
             broadcast_cmd(tag_moments2_v2);
             return des.take<Vec<Vec<cx_double>>>();
         }
