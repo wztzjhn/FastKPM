@@ -8,11 +8,14 @@ IF(ARMADILLO_INCLUDE_DIRS)
 ELSE(ARMADILLO_INCLUDE_DIRS)
     SET(TRIAL_PATHS
       /usr/include
+      /usr/local/include
       $ENV{ARMADILLO_INC}
     )
     SET(TRIAL_LIBRARY_PATHS
       /usr/lib
       /usr/lib64
+      /usr/local/lib
+      /usr/local/lib64
       $ENV{ARMADILLO_DIR}
       )
     FIND_PATH(ARMADILLO_INCLUDE_DIR armadillo ${TRIAL_PATHS})
