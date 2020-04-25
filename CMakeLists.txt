@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.12)
 
 project(fastkpm)
 set(FASTKPM_VERSION 0.1.0)
@@ -65,7 +65,7 @@ if (MPI_FOUND)
 endif()
 
 # CUDA
-find_package(CUDA 8.0)
+find_package(CUDA 9.0)
 if (CUDA_FOUND)
   message(STATUS "Found CUDA " ${CUDA_VERSION})
   include_directories(SYSTEM ${CUDA_INCLUDE_DIRS})
@@ -76,13 +76,12 @@ if (CUDA_FOUND)
     set(CUDA_HOST_COMPILER /usr/bin/clang)
   endif()
   set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-O2;-Xcompiler=-fPIC;
-    -gencode=arch=compute_30,code=sm_30;
-    -gencode=arch=compute_35,code=sm_35;
     -gencode=arch=compute_50,code=sm_50;
     -gencode=arch=compute_52,code=sm_52;
     -gencode=arch=compute_60,code=sm_60;
     -gencode=arch=compute_61,code=sm_61;
-    -gencode=arch=compute_61,code=compute_61)
+    -gencode=arch=compute_70,code=sm_70;
+    -gencode=arch=compute_70,code=compute_70)
   set(CUDA_PROPAGATE_HOST_FLAGS OFF)
 endif()
 
