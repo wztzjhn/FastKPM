@@ -7,15 +7,20 @@ IF(ARMADILLO_INCLUDE_DIRS)
   FIND_LIBRARY(ARMADILLO_LIBRARY armadillo ${ARMADILLO_LIBRARY_DIRS})
 ELSE(ARMADILLO_INCLUDE_DIRS)
     SET(TRIAL_PATHS
+      $ENV{HOME}/installs/include
       /usr/include
       /usr/local/include
+      /opt/homebrew/include
       $ENV{ARMADILLO_INC}
     )
     SET(TRIAL_LIBRARY_PATHS
+      $ENV{HOME}/installs/lib
+      $ENV{HOME}/installs/lib64
       /usr/lib
       /usr/lib64
       /usr/local/lib
       /usr/local/lib64
+      /opt/homebrew/lib
       $ENV{ARMADILLO_DIR}
       )
     FIND_PATH(ARMADILLO_INCLUDE_DIR armadillo ${TRIAL_PATHS})
