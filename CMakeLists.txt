@@ -76,7 +76,6 @@ if (CUDA_FOUND)
     set(CUDA_HOST_COMPILER /usr/bin/clang)
   endif()
   set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-O2;-Xcompiler=-fPIC;
-    -gencode=arch=compute_50,code=sm_50;
     -gencode=arch=compute_52,code=sm_52;
     -gencode=arch=compute_60,code=sm_60;
     -gencode=arch=compute_61,code=sm_61;
