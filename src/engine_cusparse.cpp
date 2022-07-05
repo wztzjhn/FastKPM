@@ -131,32 +131,6 @@ namespace fkpm {
         return cusparseZbsrmv(handle, dirA, transA, mb, nb, nnzb, alpha, descrA, bsrValA, bsrRowPtrA, bsrColIndA, blockDim, x, beta, y);
     }
     
-    // -- CSRMM (sparse-dense matrix multiplication) --
-    inline // float
-    cusparseStatus_t gen_csrmm(cusparseHandle_t handle, cusparseOperation_t transA, int m, int n, int k, int nnz, const float *alpha,
-                               const cusparseMatDescr_t descrA, const float  *csrValA, const int *csrRowPtrA, const int *csrColIndA,
-                               const float *B, int ldb, const float *beta, float *C, int ldc) {
-        return cusparseScsrmm(handle, transA, m, n, k, nnz, alpha, descrA, csrValA, csrRowPtrA, csrColIndA, B, ldb, beta, C, ldc);
-    }
-    inline // double
-    cusparseStatus_t gen_csrmm(cusparseHandle_t handle, cusparseOperation_t transA, int m, int n, int k, int nnz, const double *alpha,
-                               const cusparseMatDescr_t descrA, const double  *csrValA, const int *csrRowPtrA, const int *csrColIndA,
-                               const double *B, int ldb, const double *beta, double *C, int ldc) {
-        return cusparseDcsrmm(handle, transA, m, n, k, nnz, alpha, descrA, csrValA, csrRowPtrA, csrColIndA, B, ldb, beta, C, ldc);
-    }
-    inline // cx_float
-    cusparseStatus_t gen_csrmm(cusparseHandle_t handle, cusparseOperation_t transA, int m, int n, int k, int nnz, const cuFloatComplex *alpha,
-                               const cusparseMatDescr_t descrA, const cuFloatComplex  *csrValA, const int *csrRowPtrA, const int *csrColIndA,
-                               const cuFloatComplex *B, int ldb, const cuFloatComplex *beta, cuFloatComplex *C, int ldc) {
-        return cusparseCcsrmm(handle, transA, m, n, k, nnz, alpha, descrA, csrValA, csrRowPtrA, csrColIndA, B, ldb, beta, C, ldc);
-    }
-    inline // cx_double
-    cusparseStatus_t gen_csrmm(cusparseHandle_t handle, cusparseOperation_t transA, int m, int n, int k, int nnz, const cuDoubleComplex *alpha,
-                               const cusparseMatDescr_t descrA, const cuDoubleComplex  *csrValA, const int *csrRowPtrA, const int *csrColIndA,
-                               const cuDoubleComplex *B, int ldb, const cuDoubleComplex *beta, cuDoubleComplex *C, int ldc) {
-        return cusparseZcsrmm(handle, transA, m, n, k, nnz, alpha, descrA, csrValA, csrRowPtrA, csrColIndA, B, ldb, beta, C, ldc);
-    }
-    
     // -- BSRMM (block sparse-dense matrix multiplication) --
     inline // float
     cusparseStatus_t gen_bsrmm(cusparseHandle_t handle, cusparseDirection_t dirA, cusparseOperation_t transA, cusparseOperation_t transB,
