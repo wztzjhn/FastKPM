@@ -107,6 +107,7 @@ namespace fkpm {
                                int mb, int nb, int nnzb, const float *alpha, const cusparseMatDescr_t descrA,
                                const float *bsrValA, const int *bsrRowPtrA, const int *bsrColIndA, const int blockDim,
                                const float *x, const float *beta, float *y) {
+        if (blockDim == 1) throw std::runtime_error("blockDim==1 no longer supported in bsrmv.");
         return cusparseSbsrmv(handle, dirA, transA, mb, nb, nnzb, alpha, descrA, bsrValA, bsrRowPtrA, bsrColIndA, blockDim, x, beta, y);
     }
     inline // double
@@ -114,6 +115,7 @@ namespace fkpm {
                                int mb, int nb, int nnzb, const double *alpha, const cusparseMatDescr_t descrA,
                                const double *bsrValA, const int *bsrRowPtrA, const int *bsrColIndA, const int blockDim,
                                const double *x, const double *beta, double *y) {
+        if (blockDim == 1) throw std::runtime_error("blockDim==1 no longer supported in bsrmv.");
         return cusparseDbsrmv(handle, dirA, transA, mb, nb, nnzb, alpha, descrA, bsrValA, bsrRowPtrA, bsrColIndA, blockDim, x, beta, y);
     }
     inline // cx_float
@@ -121,6 +123,7 @@ namespace fkpm {
                                int mb, int nb, int nnzb, const cuFloatComplex *alpha, const cusparseMatDescr_t descrA,
                                const cuFloatComplex *bsrValA, const int *bsrRowPtrA, const int *bsrColIndA, const int blockDim,
                                const cuFloatComplex *x, const cuFloatComplex *beta, cuFloatComplex *y) {
+        if (blockDim == 1) throw std::runtime_error("blockDim==1 no longer supported in bsrmv.");
         return cusparseCbsrmv(handle, dirA, transA, mb, nb, nnzb, alpha, descrA, bsrValA, bsrRowPtrA, bsrColIndA, blockDim, x, beta, y);
     }
     inline // cx_double
@@ -128,6 +131,7 @@ namespace fkpm {
                                int mb, int nb, int nnzb, const cuDoubleComplex *alpha, const cusparseMatDescr_t descrA,
                                const cuDoubleComplex *bsrValA, const int *bsrRowPtrA, const int *bsrColIndA, const int blockDim,
                                const cuDoubleComplex *x,const cuDoubleComplex *beta, cuDoubleComplex *y) {
+        if (blockDim == 1) throw std::runtime_error("blockDim==1 no longer supported in bsrmv.");
         return cusparseZbsrmv(handle, dirA, transA, mb, nb, nnzb, alpha, descrA, bsrValA, bsrRowPtrA, bsrColIndA, blockDim, x, beta, y);
     }
     
@@ -137,6 +141,7 @@ namespace fkpm {
                                int mb, int n, int kb, int nnzb, const float *alpha, const cusparseMatDescr_t descrA,
                                const float *bsrValA, const int *bsrRowPtrA, const int *bsrColIndA, const int blockDim,
                                const float *B, const int ldb, const float *beta, float *C, int ldc) {
+        if (blockDim == 1) throw std::runtime_error("blockDim==1 no longer supported in bsrmm.");
         return cusparseSbsrmm(handle, dirA, transA, transB, mb, n, kb, nnzb, alpha, descrA, bsrValA, bsrRowPtrA, bsrColIndA, blockDim, B, ldb, beta, C, ldc);
     }
     inline // double
@@ -144,6 +149,7 @@ namespace fkpm {
                                int mb, int n, int kb, int nnzb, const double *alpha, const cusparseMatDescr_t descrA,
                                const double *bsrValA, const int *bsrRowPtrA, const int *bsrColIndA, const int blockDim,
                                const double *B, const int ldb, const double *beta, double *C, int ldc) {
+        if (blockDim == 1) throw std::runtime_error("blockDim==1 no longer supported in bsrmm.");
         return cusparseDbsrmm(handle, dirA, transA, transB, mb, n, kb, nnzb, alpha, descrA, bsrValA, bsrRowPtrA, bsrColIndA, blockDim, B, ldb, beta, C, ldc);
     }
     inline // cx_float
@@ -151,6 +157,7 @@ namespace fkpm {
                                int mb, int n, int kb, int nnzb, const cuFloatComplex *alpha, const cusparseMatDescr_t descrA,
                                const cuFloatComplex *bsrValA, const int *bsrRowPtrA, const int *bsrColIndA, const int blockDim,
                                const cuFloatComplex *B, const int ldb, const cuFloatComplex *beta, cuFloatComplex *C, int ldc) {
+        if (blockDim == 1) throw std::runtime_error("blockDim==1 no longer supported in bsrmm.");
         return cusparseCbsrmm(handle, dirA, transA, transB, mb, n, kb, nnzb, alpha, descrA, bsrValA, bsrRowPtrA, bsrColIndA, blockDim, B, ldb, beta, C, ldc);
     }
     inline // cx_double
@@ -158,9 +165,167 @@ namespace fkpm {
                                int mb, int n, int kb, int nnzb, const cuDoubleComplex *alpha, const cusparseMatDescr_t descrA,
                                const cuDoubleComplex *bsrValA, const int *bsrRowPtrA, const int *bsrColIndA, const int blockDim,
                                const cuDoubleComplex *B, const int ldb, const cuDoubleComplex *beta, cuDoubleComplex *C, int ldc) {
+        if (blockDim == 1) throw std::runtime_error("blockDim==1 no longer supported in bsrmm.");
         return cusparseZbsrmm(handle, dirA, transA, transB, mb, n, kb, nnzb, alpha, descrA, bsrValA, bsrRowPtrA, bsrColIndA, blockDim, B, ldb, beta, C, ldc);
     }
-    
+
+    // -- initialize the dense vector descriptor dnVecDescr --
+    inline // float
+    cusparseStatus_t cusparseCreateDnVec(cusparseDnVecDescr_t* dnVecDescr, int64_t size, float* values) {
+        return cusparseCreateDnVec(dnVecDescr, size, values, CUDA_R_32F);
+    }
+    inline // double
+    cusparseStatus_t cusparseCreateDnVec(cusparseDnVecDescr_t* dnVecDescr, int64_t size, double* values) {
+        return cusparseCreateDnVec(dnVecDescr, size, values, CUDA_R_64F);
+    }
+    inline // cx_float
+    cusparseStatus_t cusparseCreateDnVec(cusparseDnVecDescr_t* dnVecDescr, int64_t size, cuFloatComplex* values) {
+        return cusparseCreateDnVec(dnVecDescr, size, values, CUDA_C_32F);
+    }
+    inline // cx_double
+    cusparseStatus_t cusparseCreateDnVec(cusparseDnVecDescr_t* dnVecDescr, int64_t size, cuDoubleComplex* values) {
+        return cusparseCreateDnVec(dnVecDescr, size, values, CUDA_C_64F);
+    }
+
+    inline // float
+    cusparseStatus_t cusparseCreateDnMat(cusparseDnMatDescr_t* dnMatDescr, int64_t rows, int64_t cols, int64_t ld, float* values) {
+        return cusparseCreateDnMat(dnMatDescr, rows, cols, ld, values, CUDA_R_32F, CUSPARSE_ORDER_COL);
+    }
+    inline // double
+    cusparseStatus_t cusparseCreateDnMat(cusparseDnMatDescr_t* dnMatDescr, int64_t rows, int64_t cols, int64_t ld, double* values) {
+        return cusparseCreateDnMat(dnMatDescr, rows, cols, ld, values, CUDA_R_64F, CUSPARSE_ORDER_COL);
+    }
+    inline // cx_float
+    cusparseStatus_t cusparseCreateDnMat(cusparseDnMatDescr_t* dnMatDescr, int64_t rows, int64_t cols, int64_t ld, cuFloatComplex* values) {
+        return cusparseCreateDnMat(dnMatDescr, rows, cols, ld, values, CUDA_C_32F, CUSPARSE_ORDER_COL);
+    }
+    inline // cx_double
+    cusparseStatus_t cusparseCreateDnMat(cusparseDnMatDescr_t* dnMatDescr, int64_t rows, int64_t cols, int64_t ld, cuDoubleComplex* values) {
+        return cusparseCreateDnMat(dnMatDescr, rows, cols, ld, values, CUDA_C_64F, CUSPARSE_ORDER_COL);
+    }
+
+    // -- initialize the sparse matrix descriptor spMatDescr in the CSR format --
+    inline // float
+    cusparseStatus_t cusparseCreateCsr(cusparseSpMatDescr_t* spMatDescr, int64_t rows, int64_t cols, int64_t nnz,
+                                       void* csrRowOffsets, void* csrColInd, float* csrValues) {
+        return cusparseCreateCsr(spMatDescr, rows, cols, nnz, csrRowOffsets, csrColInd, csrValues,
+                                 CUSPARSE_INDEX_32I, CUSPARSE_INDEX_32I,
+                                 CUSPARSE_INDEX_BASE_ZERO, CUDA_R_32F);
+    }
+    inline // double
+    cusparseStatus_t cusparseCreateCsr(cusparseSpMatDescr_t* spMatDescr, int64_t rows, int64_t cols, int64_t nnz,
+                                       void* csrRowOffsets, void* csrColInd, double* csrValues) {
+        return cusparseCreateCsr(spMatDescr, rows, cols, nnz, csrRowOffsets, csrColInd, csrValues,
+                                 CUSPARSE_INDEX_32I, CUSPARSE_INDEX_32I,
+                                 CUSPARSE_INDEX_BASE_ZERO, CUDA_R_64F);
+    }
+    inline // cx_float
+    cusparseStatus_t cusparseCreateCsr(cusparseSpMatDescr_t* spMatDescr, int64_t rows, int64_t cols, int64_t nnz,
+                                       void* csrRowOffsets, void* csrColInd, cuFloatComplex* csrValues) {
+        return cusparseCreateCsr(spMatDescr, rows, cols, nnz, csrRowOffsets, csrColInd, csrValues,
+                                 CUSPARSE_INDEX_32I, CUSPARSE_INDEX_32I,
+                                 CUSPARSE_INDEX_BASE_ZERO, CUDA_C_32F);
+    }
+    inline // cx_double
+    cusparseStatus_t cusparseCreateCsr(cusparseSpMatDescr_t* spMatDescr, int64_t rows, int64_t cols, int64_t nnz,
+                                       void* csrRowOffsets, void* csrColInd, cuDoubleComplex* csrValues) {
+        return cusparseCreateCsr(spMatDescr, rows, cols, nnz, csrRowOffsets, csrColInd, csrValues,
+                                 CUSPARSE_INDEX_32I, CUSPARSE_INDEX_32I,
+                                 CUSPARSE_INDEX_BASE_ZERO, CUDA_C_64F);
+    }
+
+    inline // float
+    cusparseStatus_t cusparseSpMV_bufferSize(cusparseHandle_t handle, cusparseOperation_t opA, const float* alpha, cusparseSpMatDescr_t matA,
+                                             cusparseDnVecDescr_t vecX, const float* beta, cusparseDnVecDescr_t vecY, size_t* bufferSize) {
+        return cusparseSpMV_bufferSize(handle, opA, alpha, matA, vecX, beta, vecY, CUDA_R_32F, CUSPARSE_SPMV_CSR_ALG1, bufferSize);
+    }
+    inline // double
+    cusparseStatus_t cusparseSpMV_bufferSize(cusparseHandle_t handle, cusparseOperation_t opA, const double* alpha, cusparseSpMatDescr_t matA,
+                                             cusparseDnVecDescr_t vecX, const double* beta, cusparseDnVecDescr_t vecY, size_t* bufferSize) {
+        return cusparseSpMV_bufferSize(handle, opA, alpha, matA, vecX, beta, vecY, CUDA_R_64F, CUSPARSE_SPMV_CSR_ALG1, bufferSize);
+    }
+    inline // cx_float
+    cusparseStatus_t cusparseSpMV_bufferSize(cusparseHandle_t handle, cusparseOperation_t opA, const cuFloatComplex* alpha, cusparseSpMatDescr_t matA,
+                                             cusparseDnVecDescr_t vecX, const cuFloatComplex* beta, cusparseDnVecDescr_t vecY, size_t* bufferSize) {
+        return cusparseSpMV_bufferSize(handle, opA, alpha, matA, vecX, beta, vecY, CUDA_C_32F, CUSPARSE_SPMV_CSR_ALG1, bufferSize);
+    }
+    inline // cx_double
+    cusparseStatus_t cusparseSpMV_bufferSize(cusparseHandle_t handle, cusparseOperation_t opA, const cuDoubleComplex* alpha, cusparseSpMatDescr_t matA,
+                                             cusparseDnVecDescr_t vecX, const cuDoubleComplex* beta, cusparseDnVecDescr_t vecY, size_t* bufferSize) {
+        return cusparseSpMV_bufferSize(handle, opA, alpha, matA, vecX, beta, vecY, CUDA_C_64F, CUSPARSE_SPMV_CSR_ALG1, bufferSize);
+    }
+
+    inline // float
+    cusparseStatus_t cusparseSpMV(cusparseHandle_t handle, cusparseOperation_t opA, const float* alpha, cusparseSpMatDescr_t matA,
+                                  cusparseDnVecDescr_t vecX, const float* beta, cusparseDnVecDescr_t vecY, void* externalBuffer) {
+        return cusparseSpMV(handle, opA, alpha, matA, vecX, beta, vecY, CUDA_R_32F, CUSPARSE_SPMV_CSR_ALG1, externalBuffer);
+    }
+    inline // double
+    cusparseStatus_t cusparseSpMV(cusparseHandle_t handle, cusparseOperation_t opA, const double* alpha, cusparseSpMatDescr_t matA,
+                                  cusparseDnVecDescr_t vecX, const double* beta, cusparseDnVecDescr_t vecY, void* externalBuffer) {
+        return cusparseSpMV(handle, opA, alpha, matA, vecX, beta, vecY, CUDA_R_64F, CUSPARSE_SPMV_CSR_ALG1, externalBuffer);
+    }
+    inline // cx_float
+    cusparseStatus_t cusparseSpMV(cusparseHandle_t handle, cusparseOperation_t opA, const cuFloatComplex* alpha, cusparseSpMatDescr_t matA,
+                                  cusparseDnVecDescr_t vecX, const cuFloatComplex* beta, cusparseDnVecDescr_t vecY, void* externalBuffer) {
+        return cusparseSpMV(handle, opA, alpha, matA, vecX, beta, vecY, CUDA_C_32F, CUSPARSE_SPMV_CSR_ALG1, externalBuffer);
+    }
+    inline // cx_double
+    cusparseStatus_t cusparseSpMV(cusparseHandle_t handle, cusparseOperation_t opA, const cuDoubleComplex* alpha, cusparseSpMatDescr_t matA,
+                                  cusparseDnVecDescr_t vecX, const cuDoubleComplex* beta, cusparseDnVecDescr_t vecY, void* externalBuffer) {
+        return cusparseSpMV(handle, opA, alpha, matA, vecX, beta, vecY, CUDA_C_64F, CUSPARSE_SPMV_CSR_ALG1, externalBuffer);
+    }
+
+    inline // float
+    cusparseStatus_t cusparseSpMM_bufferSize(cusparseHandle_t handle, cusparseOperation_t opA, cusparseOperation_t opB,
+                                             const float* alpha, cusparseSpMatDescr_t matA, cusparseDnMatDescr_t matB,
+                                             const float* beta, cusparseDnMatDescr_t matC, size_t* bufferSize) {
+        return cusparseSpMM_bufferSize(handle, opA, opB, alpha, matA, matB, beta, matC, CUDA_R_32F, CUSPARSE_SPMM_CSR_ALG1, bufferSize);
+    }
+    inline // double
+    cusparseStatus_t cusparseSpMM_bufferSize(cusparseHandle_t handle, cusparseOperation_t opA, cusparseOperation_t opB,
+                                             const double* alpha, cusparseSpMatDescr_t matA, cusparseDnMatDescr_t matB,
+                                             const double* beta, cusparseDnMatDescr_t matC, size_t* bufferSize) {
+        return cusparseSpMM_bufferSize(handle, opA, opB, alpha, matA, matB, beta, matC, CUDA_R_64F, CUSPARSE_SPMM_CSR_ALG1, bufferSize);
+    }
+    inline // cx_float
+    cusparseStatus_t cusparseSpMM_bufferSize(cusparseHandle_t handle, cusparseOperation_t opA, cusparseOperation_t opB,
+                                             const cuFloatComplex* alpha, cusparseSpMatDescr_t matA, cusparseDnMatDescr_t matB,
+                                             const cuFloatComplex* beta, cusparseDnMatDescr_t matC, size_t* bufferSize) {
+        return cusparseSpMM_bufferSize(handle, opA, opB, alpha, matA, matB, beta, matC, CUDA_C_32F, CUSPARSE_SPMM_CSR_ALG1, bufferSize);
+    }
+    inline // cx_double
+    cusparseStatus_t cusparseSpMM_bufferSize(cusparseHandle_t handle, cusparseOperation_t opA, cusparseOperation_t opB,
+                                             const cuDoubleComplex* alpha, cusparseSpMatDescr_t matA, cusparseDnMatDescr_t matB,
+                                             const cuDoubleComplex* beta, cusparseDnMatDescr_t matC, size_t* bufferSize) {
+        return cusparseSpMM_bufferSize(handle, opA, opB, alpha, matA, matB, beta, matC, CUDA_C_64F, CUSPARSE_SPMM_CSR_ALG1, bufferSize);
+    }
+
+    inline // float
+    cusparseStatus_t cusparseSpMM(cusparseHandle_t handle, cusparseOperation_t opA, cusparseOperation_t opB,
+                                  const float* alpha, cusparseSpMatDescr_t matA, cusparseDnMatDescr_t matB,
+                                  const float* beta, cusparseDnMatDescr_t matC, void* externalBuffer) {
+        return cusparseSpMM(handle, opA, opB, alpha, matA, matB, beta, matC, CUDA_R_32F, CUSPARSE_SPMM_CSR_ALG1, externalBuffer);
+    }
+    inline // double
+    cusparseStatus_t cusparseSpMM(cusparseHandle_t handle, cusparseOperation_t opA, cusparseOperation_t opB,
+                                  const double* alpha, cusparseSpMatDescr_t matA, cusparseDnMatDescr_t matB,
+                                  const double* beta, cusparseDnMatDescr_t matC, void* externalBuffer) {
+        return cusparseSpMM(handle, opA, opB, alpha, matA, matB, beta, matC, CUDA_R_64F, CUSPARSE_SPMM_CSR_ALG1, externalBuffer);
+    }
+    inline // cx_float
+    cusparseStatus_t cusparseSpMM(cusparseHandle_t handle, cusparseOperation_t opA, cusparseOperation_t opB,
+                                  const cuFloatComplex* alpha, cusparseSpMatDescr_t matA, cusparseDnMatDescr_t matB,
+                                  const cuFloatComplex* beta, cusparseDnMatDescr_t matC, void* externalBuffer) {
+        return cusparseSpMM(handle, opA, opB, alpha, matA, matB, beta, matC, CUDA_C_32F, CUSPARSE_SPMM_CSR_ALG1, externalBuffer);
+    }
+    inline // cx_double
+    cusparseStatus_t cusparseSpMM(cusparseHandle_t handle, cusparseOperation_t opA, cusparseOperation_t opB,
+                                  const cuDoubleComplex* alpha, cusparseSpMatDescr_t matA, cusparseDnMatDescr_t matB,
+                                  const cuDoubleComplex* beta, cusparseDnMatDescr_t matC, void* externalBuffer) {
+        return cusparseSpMM(handle, opA, opB, alpha, matA, matB, beta, matC, CUDA_C_64F, CUSPARSE_SPMM_CSR_ALG1, externalBuffer);
+    }
+
     // -- DOTC (complex-conjugated dot product) --
     inline // float
     cublasStatus_t gen_dotc(cublasHandle_t handle, int n, const float *x, int incx, const float *y, int incy, float *result) {
@@ -232,36 +397,92 @@ namespace fkpm {
     public:
         int size = 0;
         int capacity = 0;
-        T* ptr = 0;
-        void resize(int size) {
-            this->size = size;
-            if (size > capacity) {
-                capacity = (3*size)/2;
+        T* ptr = nullptr;
+
+        CuVec() = default;
+
+        void resize(int size_) {
+            this->size = size_;
+            if (size_ > capacity) {
+                capacity = (3 * size_) / 2;
                 TRY(cudaFree(ptr));
                 TRY(cudaMalloc(&ptr, capacity*sizeof(T)));
             }
         }
+
+        // copy constructor
+        CuVec(const CuVec<T> &old) {
+            size = old.size;
+            capacity = old.capacity;
+            if (ptr != nullptr) TRY(cudaFree(ptr));
+            TRY(cudaMalloc(&ptr, capacity*sizeof(T)));
+            TRY(cudaMemcpy(ptr, old.ptr, size*sizeof(T), cudaMemcpyDeviceToDevice));
+        }
+
+        // move constructor
+        CuVec(CuVec<T> &&old) noexcept {
+            size = old.size;
+            capacity = old.capacity;
+            ptr = old.ptr;
+            old.ptr = nullptr;
+        }
+
+        // copy/move assignment constructor
+        CuVec& operator=(CuVec<T> old) {
+            swap(*this, old);
+            return *this;
+        }
+
+        ~CuVec() {
+            if (ptr != nullptr) TRY(cudaFree(ptr));
+            size = capacity = 0;
+            ptr = nullptr;
+        }
+
         void memset(int value) {
             TRY(cudaMemset(ptr, value, size*sizeof(T)));
         }
-        void from_host(int size, T const* src) {
-            resize(size);
-            TRY(cudaMemcpy(ptr, src, size*sizeof(T), cudaMemcpyHostToDevice));
-        }
-        void from_device(CuVec<T> const& that) {
-            resize(that.size);
-            TRY(cudaMemcpy(ptr, that.ptr, size*sizeof(T), cudaMemcpyDeviceToDevice));
+        void from_host(int size_, T const* src) {
+            resize(size_);
+            TRY(cudaMemcpy(ptr, src, size_*sizeof(T), cudaMemcpyHostToDevice));
         }
         void to_host(T* dst) const {
             TRY(cudaMemcpy(dst, ptr, size*sizeof(T), cudaMemcpyDeviceToHost));
         }
-        void deallocate() {
-            TRY(cudaFree(ptr));
-            size = capacity = 0;
-            ptr = 0;
-        }
     };
-    
+
+    template <typename T> void swap(CuVec<T> &lhs, CuVec<T> &rhs) {
+        std::swap(lhs.size, rhs.size);
+        std::swap(lhs.capacity, rhs.capacity);
+        std::swap(lhs.ptr, rhs.ptr);
+    }
+
+    template <typename T>
+    class CuSpMat {
+    public:
+        CuSpMat() = default;
+
+        CuSpMat(int n_rows_, int n_cols_, int b_len_, int nnzb_,
+                const Vec<int> &row_ptr_, const Vec<int> &col_idx_, const Vec<T> &val_) {
+            mb    = n_rows_;
+            nb    = n_cols_;
+            b_len = b_len_;
+            nnzb  = nnzb_;
+            HRowPtr_d.from_host(static_cast<int>(row_ptr_.size()), row_ptr_.data());
+            HColIndex_d.from_host(static_cast<int>(col_idx_.size()), col_idx_.data());
+            HVal_d.from_host(static_cast<int>(val_.size()), val_.data());
+        }
+
+        int mb;
+        int nb;
+        int b_len;
+        int nnzb;
+        CuVec<int> HRowPtr_d;
+        CuVec<int> HColIndex_d;
+        CuVec<T> HVal_d;
+    };
+
+
     template <typename T>
     class Engine_cuSPARSE: public Engine<T> {
     public:
@@ -284,9 +505,8 @@ namespace fkpm {
         CuVec<T> R_d, xi_d, t_d;
         CuVec<T> a_d[3];
         CuVec<T> b_d[3];
-        
-        CuVec<int> HColIndex_d, HRowPtr_d;
-        CuVec<T> HVal_d;
+
+        CuSpMat<T> H_d;
         
         CuVec<int> DRowIndex_d, DColIndex_d;
         CuVec<T> DVal_d;
@@ -305,25 +525,74 @@ namespace fkpm {
         ~Engine_cuSPARSE() {
             TRY(cudaSetDevice(device));
             
-            R_d.deallocate();
-            xi_d.deallocate();
-            t_d.deallocate();
-            for (int i = 0; i < 3; i++) {
-                a_d[i].deallocate();
-                b_d[i].deallocate();
-            }
-            
-            HRowPtr_d.deallocate();
-            HColIndex_d.deallocate();
-            HVal_d.deallocate();
-            
-            DRowIndex_d.deallocate();
-            DColIndex_d.deallocate();
-            DVal_d.deallocate();
-            
             TRY(cusparseDestroyMatDescr(cs_mat_descr));
             TRY(cusparseDestroy(cs_handle));
             TRY(cublasDestroy(bl_handle));
+        }
+
+        // Y = \alpha A X + \beta Y
+        void productMV(const CuSpMat<T> &A, const CuVec<T> &X, CuVec<T> &Y, const T_cu &alpha, const T_cu &beta) {
+            int m = A.mb * A.b_len;
+            int n = A.nb * A.b_len;
+            if (n != X.size) throw std::logic_error("size mismatch in matrix vector productMV.");
+            if (Y.size != m) Y.resize(m);
+
+            if (A.b_len > 1) {
+                TRY(gen_bsrmv(cs_handle, CUSPARSE_DIRECTION_COLUMN, CUSPARSE_OPERATION_NON_TRANSPOSE,
+                              A.mb, A.nb, A.nnzb, &alpha, cs_mat_descr,
+                              (T_cu *)A.HVal_d.ptr, A.HRowPtr_d.ptr, A.HColIndex_d.ptr, A.b_len,
+                              (T_cu *)X.ptr, &beta, (T_cu *)Y.ptr));
+            } else {
+                cusparseSpMatDescr_t cs_spmat_descr;
+                cusparseDnVecDescr_t cs_vecX_descr, cs_vecY_descr;
+                size_t buffer_size;
+                T* buffer_ptr = nullptr;
+                TRY(cusparseCreateCsr(&cs_spmat_descr, A.mb, A.nb, A.nnzb, A.HRowPtr_d.ptr, A.HColIndex_d.ptr, (T_cu *)A.HVal_d.ptr));
+                TRY(cusparseCreateDnVec(&cs_vecX_descr, X.size, (T_cu *)X.ptr));
+                TRY(cusparseCreateDnVec(&cs_vecY_descr, Y.size, (T_cu *)Y.ptr));
+                TRY(cusparseSpMV_bufferSize(cs_handle, CUSPARSE_OPERATION_NON_TRANSPOSE, &alpha, cs_spmat_descr,
+                                            cs_vecX_descr, &beta, cs_vecY_descr, &buffer_size));
+                TRY(cudaMalloc(&buffer_ptr, buffer_size));
+                TRY(cusparseSpMV(cs_handle, CUSPARSE_OPERATION_NON_TRANSPOSE, &alpha, cs_spmat_descr,
+                                 cs_vecX_descr, &beta, cs_vecY_descr, buffer_ptr));
+                TRY(cudaFree(buffer_ptr));
+                TRY(cusparseDestroySpMat(cs_spmat_descr));
+                TRY(cusparseDestroyDnVec(cs_vecX_descr));
+                TRY(cusparseDestroyDnVec(cs_vecY_descr));
+            }
+        }
+
+        // C = alpha A * Bt^T + beta C, shape of Bt: n * k
+        void productMM(const CuSpMat<T> &A, const CuVec<T> &Bt, CuVec<T> &C, const T_cu &alpha, const T_cu &beta) {
+            int m = A.mb * A.b_len;
+            int k = A.nb * A.b_len;
+            int n = Bt.size / k;
+            if (k * n != Bt.size) throw std::logic_error("size mismatch in matrix matrix productMM.");
+            if (m * n != C.size) C.resize(m * n);
+
+            if (A.b_len > 1) {
+                TRY(gen_bsrmm(cs_handle, CUSPARSE_DIRECTION_COLUMN, CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_TRANSPOSE,
+                              A.mb, n, A.nb, A.nnzb,
+                              &alpha, cs_mat_descr, (T_cu *)A.HVal_d.ptr, A.HRowPtr_d.ptr, A.HColIndex_d.ptr, A.b_len,
+                              (T_cu *)Bt.ptr, n, &beta, (T_cu *)C.ptr, m));
+            } else {
+                cusparseSpMatDescr_t cs_spmat_descr;
+                cusparseDnMatDescr_t cs_matBt_descr, cs_matC_descr;
+                size_t buffer_size;
+                T* buffer_ptr = nullptr;
+                TRY(cusparseCreateCsr(&cs_spmat_descr, A.mb, A.nb, A.nnzb, A.HRowPtr_d.ptr, A.HColIndex_d.ptr, (T_cu *)A.HVal_d.ptr));
+                TRY(cusparseCreateDnMat(&cs_matBt_descr, n, k, n, (T_cu *)Bt.ptr));
+                TRY(cusparseCreateDnMat(&cs_matC_descr, m, n, m, (T_cu *)C.ptr));
+                TRY(cusparseSpMM_bufferSize(cs_handle, CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_TRANSPOSE,
+                                            &alpha, cs_spmat_descr, cs_matBt_descr, &beta, cs_matC_descr, &buffer_size));
+                TRY(cudaMalloc(&buffer_ptr, buffer_size));
+                TRY(cusparseSpMM(cs_handle, CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_TRANSPOSE,
+                                 &alpha, cs_spmat_descr, cs_matBt_descr, &beta, cs_matC_descr, buffer_ptr));
+                TRY(cudaFree(buffer_ptr));
+                TRY(cusparseDestroySpMat(cs_spmat_descr));
+                TRY(cusparseDestroyDnMat(cs_matBt_descr));
+                TRY(cusparseDestroyDnMat(cs_matC_descr));
+            }
         }
         
         EnergyScale energy_scale(SpMatBsr<T> const& H, double extend, int iters) {
@@ -331,24 +600,19 @@ namespace fkpm {
             assert(H.n_rows == H.n_cols);
             
             // Storage for sparse matrix H
-            int n_rows = H.n_rows;
-            int b_len = H.b_len;
-            int n_blocks = H.n_blocks();
-            CuVec<int> HColIndex_d, HRowPtr_d;
-            CuVec<T> HVal_d;
-            HRowPtr_d.from_host(H.row_ptr.size(), H.row_ptr.data());
-            HColIndex_d.from_host(H.col_idx.size(), H.col_idx.data());
-            HVal_d.from_host(H.val.size(), H.val.data());
+            int nb = H.n_rows;
+            int n = H.n_rows * H.b_len;
+            CuSpMat<T> H_cu(H.n_rows, H.n_cols, H.b_len, H.n_blocks(), H.row_ptr, H.col_idx, H.val);
             
             // Storage for dense vectors
             CuVec<T> v0_d, v1_d, w_d;
-            v0_d.resize(n_rows);
+            v0_d.resize(n);
             v0_d.memset(0);
-            arma::Col<T> v1(n_rows);
+            arma::Col<T> v1(n);
             v1.randn();
             v1 /= std::sqrt(std::real(arma::cdot(v1, v1)));
-            v1_d.from_host(n_rows, v1.memptr());
-            w_d.resize(n_rows);
+            v1_d.from_host(n, v1.memptr());
+            w_d.resize(n);
             
             // Storage for tridiagonal matrix elements
             Vec<double> alpha(iters), beta(iters);
@@ -356,53 +620,39 @@ namespace fkpm {
             
             for (int j = 1; j < iters; j++) {
                 // w = H * v1
-                TRY(gen_bsrmv(cs_handle, CUSPARSE_DIRECTION_COLUMN, CUSPARSE_OPERATION_NON_TRANSPOSE,
-                              n_rows, n_rows, n_blocks, &one_cu, cs_mat_descr,
-                              (T_cu *)HVal_d.ptr, HRowPtr_d.ptr, HColIndex_d.ptr, b_len,
-                              (T_cu *)v1_d.ptr, &zero_cu, (T_cu *)w_d.ptr));
-                
+                productMV(H_cu, v1_d, w_d, one_cu, zero_cu);
+
                 // alpha[j-1] = real(w dot v1);
                 T_cu cdot_res;
-                TRY(gen_dotc(bl_handle, n_rows, (T_cu *)w_d.ptr, 1, (T_cu *)v1_d.ptr, 1, &cdot_res));
+                TRY(gen_dotc(bl_handle, n, (T_cu *)w_d.ptr, 1, (T_cu *)v1_d.ptr, 1, &cdot_res));
                 alpha[j-1] = cuda_real(cdot_res);
                 
                 // w = w - alpha[j-1] * v1 - beta[j-1] * v0;
                 T_cu scal = cuda_cast(T(-alpha[j-1]));
-                TRY(gen_axpy(bl_handle, n_rows, &scal, (T_cu *)v1_d.ptr, 1, (T_cu *)w_d.ptr, 1));
+                TRY(gen_axpy(bl_handle, n, &scal, (T_cu *)v1_d.ptr, 1, (T_cu *)w_d.ptr, 1));
                 scal = cuda_cast(T(-beta[j-1]));
-                TRY(gen_axpy(bl_handle, n_rows, &scal, (T_cu *)v0_d.ptr, 1, (T_cu *)w_d.ptr, 1));
+                TRY(gen_axpy(bl_handle, n, &scal, (T_cu *)v0_d.ptr, 1, (T_cu *)w_d.ptr, 1));
                 
                 // beta[j] = sqrt(real(w dot w))
-                TRY(gen_dotc(bl_handle, n_rows, (T_cu *)w_d.ptr, 1, (T_cu *)w_d.ptr, 1, &cdot_res));
+                TRY(gen_dotc(bl_handle, n, (T_cu *)w_d.ptr, 1, (T_cu *)w_d.ptr, 1, &cdot_res));
                 beta[j] = std::sqrt(cuda_real(cdot_res));
                 
                 // v0 = v1;
-                v0_d.from_device(v1_d);
+                v0_d = v1_d;
                 
                 // v1 = w / beta[j];
-                v1_d.from_device(w_d);
+                v1_d = w_d;
                 scal = cuda_cast(T(1.0 / beta[j]));
-                TRY(gen_scal(bl_handle, n_rows, &scal, (T_cu *)v1_d.ptr, 1));
+                TRY(gen_scal(bl_handle, n, &scal, (T_cu *)v1_d.ptr, 1));
             }
             
             // w = H * v1;
-            TRY(gen_bsrmv(cs_handle, CUSPARSE_DIRECTION_COLUMN, CUSPARSE_OPERATION_NON_TRANSPOSE,
-                          n_rows, n_rows, n_blocks, &one_cu, cs_mat_descr,
-                          (T_cu *)HVal_d.ptr, HRowPtr_d.ptr, HColIndex_d.ptr, b_len,
-                          (T_cu *)v1_d.ptr, &zero_cu, (T_cu *)w_d.ptr));
+            productMV(H_cu, v1_d, w_d, one_cu, zero_cu);
             
             // alpha[iters-1] = real(w dot v1)
             T_cu cdot_res;
-            TRY(gen_dotc(bl_handle, n_rows, (T_cu *)w_d.ptr, 1, (T_cu *)v1_d.ptr, 1, &cdot_res));
+            TRY(gen_dotc(bl_handle, n, (T_cu *)w_d.ptr, 1, (T_cu *)v1_d.ptr, 1, &cdot_res));
             alpha[iters-1] = cuda_real(cdot_res);
-            
-            // Deallocate all CUDA storage
-            v0_d.deallocate();
-            v1_d.deallocate();
-            w_d.deallocate();
-            HRowPtr_d.deallocate();
-            HColIndex_d.deallocate();
-            HVal_d.deallocate();
             
             // Find eigenvalues of tridiagonal matrix
             arma::mat tri(iters, iters);
@@ -475,10 +725,8 @@ namespace fkpm {
                 }
             }
             assert(diag_cnt == n_rows);
-            
-            HRowPtr_d.from_host(H.row_ptr.size(), H.row_ptr.data());
-            HColIndex_d.from_host(H.col_idx.size(), H.col_idx.data());
-            HVal_d.from_host(Hs_val.size(), Hs_val.data());
+
+            H_d = CuSpMat<T>(H.n_rows, H.n_cols, H.b_len, H.n_blocks(), H.row_ptr, H.col_idx, Hs_val);
         }
         
         // C = (alpha H B^T)^T + beta C
@@ -488,13 +736,7 @@ namespace fkpm {
             if (s < 1) s = this->R.n_cols;
             
             // t = H B^T
-            TRY(gen_bsrmm(cs_handle, CUSPARSE_DIRECTION_COLUMN, CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_TRANSPOSE,
-                          n_rows, s, n_rows, n_blocks, // H # block rows, # element cols, # block cols, # nonzero blocks
-                          &one_cu,
-                          cs_mat_descr, (T_cu *)HVal_d.ptr, HRowPtr_d.ptr, HColIndex_d.ptr, b_len, // H matrix
-                          (T_cu *)B_d.ptr, s,
-                          &zero_cu,
-                          (T_cu *)t_d.ptr, n));
+            productMM(H_d, B_d, t_d, one_cu, zero_cu);
             
             // C = alpha t^T + beta C
             T_cu alpha_cu = cuda_cast(alpha);
@@ -507,10 +749,7 @@ namespace fkpm {
         void cgemv_H(T alpha, CuVec<T> const& x_d, T beta, CuVec<T> const& y_d) {
             T_cu alpha_cu = cuda_cast(alpha);
             T_cu beta_cu  = cuda_cast(beta);
-            TRY(gen_bsrmv(cs_handle, CUSPARSE_DIRECTION_COLUMN, CUSPARSE_OPERATION_NON_TRANSPOSE,
-                          n_rows, n_rows, n_blocks, &alpha_cu, cs_mat_descr,
-                          (T_cu *)HVal_d.ptr, HRowPtr_d.ptr, HColIndex_d.ptr, b_len,
-                          (T_cu *)x_d.ptr, &beta_cu, (T_cu *)y_d.ptr));
+            productMV(H_d, x_d, y_d, alpha_cu, beta_cu);
         }
         
         Vec<double> moments(int M) {
@@ -520,7 +759,7 @@ namespace fkpm {
             
             Vec<double> mu(M);
             
-            a_d[0].from_device(R_d);            // a0 = \alpha_0 = R
+            a_d[0] = R_d;                       // a0 = \alpha_0 = R
             a_d[1].memset(0);
             cgemm_H(1, R_d, 0, a_d[1]);         // a1 = \alpha_1 = H R
             
@@ -531,7 +770,7 @@ namespace fkpm {
             mu[1] = cuda_real(result2);
             
             for (int m = 1; m < M/2; m++) {
-                a_d[2].from_device(a_d[0]);
+                a_d[2] = a_d[0];
                 cgemm_H(2, a_d[1], -1, a_d[2]); // a2 = 2 H a1 - a0
                 
                 auto temp = a_d[0];
@@ -562,15 +801,9 @@ namespace fkpm {
             TRY(cudaMemGetInfo(&mem_free,&mem_total));
             mem_percent = 1.0- (double) mem_free/mem_total;
             if(mem_percent > 0.7) std::cout << "Warning1: gpu mem used " << mem_percent << "!\n";
-            
-            CuVec<int> j1_RowPtr_d, j1_ColIdx_d, j2_RowPtr_d, j2_ColIdx_d;
-            CuVec<T>   j1_Values_d, j2_Values_d;
-            j1_RowPtr_d.from_host(j1op.row_ptr.size(), j1op.row_ptr.data());
-            j1_ColIdx_d.from_host(j1op.col_idx.size(), j1op.col_idx.data());
-            j1_Values_d.from_host(j1op.val.size(),     j1op.val.data());
-            j2_RowPtr_d.from_host(j2op.row_ptr.size(), j2op.row_ptr.data());
-            j2_ColIdx_d.from_host(j2op.col_idx.size(), j2op.col_idx.data());
-            j2_Values_d.from_host(j2op.val.size(),     j2op.val.data());
+
+            CuSpMat<T> j1_d(j1op.n_rows, j1op.n_cols, j1op.b_len, j1op.n_blocks(), j1op.row_ptr, j1op.col_idx, j1op.val);
+            CuSpMat<T> j2_d(j2op.n_rows, j2op.n_cols, j2op.b_len, j2op.n_blocks(), j2op.row_ptr, j2op.col_idx, j2op.val);
             int n  = this->R.n_rows;
             assert(b_len * n_rows == n);
             assert(j1op.n_rows == n && j1op.n_cols == n);
@@ -614,47 +847,41 @@ namespace fkpm {
                 temp_d.from_host(sz, this->R.colptr(k));
                 TRY(gen_geam(bl_handle, CUBLAS_OP_T, CUBLAS_OP_N, s, n, &one_cu, (T_cu *)temp_d.ptr, n,
                              &zero_cu, (T_cu *)Rchunk_d.ptr, s, (T_cu *)Rchunk_d.ptr, s));  // transfer Rchunk_d
-                TRY(gen_bsrmm(cs_handle, CUSPARSE_DIRECTION_COLUMN, CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_TRANSPOSE,
-                              n_rows, s, n_rows, n_blocks, &one_cu, cs_mat_descr,
-                              (T_cu *)j1_Values_d.ptr, j1_RowPtr_d.ptr, j1_ColIdx_d.ptr, b_len,
-                              (T_cu *)Rchunk_d.ptr, s, &zero_cu, (T_cu *)temp_d.ptr, n));
+                productMM(j1_d, Rchunk_d, temp_d, one_cu, zero_cu);
                 TRY(gen_geam(bl_handle, CUBLAS_OP_T, CUBLAS_OP_N, s, n, &one_cu, (T_cu *)temp_d.ptr, n,
                              &zero_cu, (T_cu *)atild0_d.ptr, s, (T_cu *)atild0_d.ptr, s));  // atild0_d = (j1 * Rchunk_d^T)^T
                 int alpha_begin = 0;
                 int alpha_end   = a_chunk_ncols - 1;
-                alpha[0].from_device(Rchunk_d);         // \alpha_0^T
+                alpha[0] = Rchunk_d;                       // \alpha_0^T
                 cgemm_H(1, alpha[0], 0, alpha[1], s);      // \alpha_1^T
                 while (alpha_begin <= alpha_end) {
                     if (alpha_begin != 0) {
-                        alpha[0].from_device(alpha[a_chunk_ncols-2]);
+                        alpha[0] = alpha[a_chunk_ncols-2];
                         cgemm_H(2, alpha[a_chunk_ncols-1], -1, alpha[0], s);
-                        alpha[1].from_device(alpha[a_chunk_ncols-1]);
+                        alpha[1] = alpha[a_chunk_ncols-1];
                         cgemm_H(2, alpha[0], -1, alpha[1], s);
                     }
                     for (int m1 = 2; m1 <= alpha_end - alpha_begin; m1++) {
-                        alpha[m1].from_device(alpha[m1-2]);
+                        alpha[m1] = alpha[m1-2];
                         cgemm_H(2, alpha[m1-1], -1, alpha[m1], s);
                     }
                     int atild_begin = 0;
                     int atild_end   = a_chunk_ncols - 1;
-                    atild[0].from_device(atild0_d);
+                    atild[0] = atild0_d;
                     cgemm_H(1, atild[0], 0, atild[1], s);
                     while (atild_begin <= atild_end) {
                         if (atild_begin != 0) {
-                            atild[0].from_device(atild[a_chunk_ncols-2]);
+                            atild[0] = atild[a_chunk_ncols-2];
                             cgemm_H(2, atild[a_chunk_ncols-1], -1, atild[0], s);
-                            atild[1].from_device(atild[a_chunk_ncols-1]);
+                            atild[1] = atild[a_chunk_ncols-1];
                             cgemm_H(2, atild[0], -1, atild[1], s);
                         }
                         for (int m2 = 2; m2 <= atild_end - atild_begin; m2++) {
-                            atild[m2].from_device(atild[m2-2]);
+                            atild[m2] = atild[m2-2];
                             cgemm_H(2, atild[m2-1], -1, atild[m2], s);
                         }
                         for (int m2 = atild_begin; m2 <= atild_end; m2++) {
-                            TRY(gen_bsrmm(cs_handle, CUSPARSE_DIRECTION_COLUMN, CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_TRANSPOSE,
-                                          n_rows, s, n_rows, n_blocks, &one_cu, cs_mat_descr,
-                                          (T_cu *)j2_Values_d.ptr, j2_RowPtr_d.ptr, j2_ColIdx_d.ptr, b_len,
-                                          (T_cu *)atild[m2-atild_begin].ptr, s, &zero_cu, (T_cu *)t_d.ptr, n));
+                            productMM(j2_d, atild[m2-atild_begin], t_d, one_cu, zero_cu);
                             TRY(gen_geam(bl_handle, CUBLAS_OP_T, CUBLAS_OP_N, s, n, &one_cu, (T_cu *)t_d.ptr, n,
                                          &zero_cu, (T_cu *)temp_d.ptr, s, (T_cu *)temp_d.ptr, s));
                             for (int m1 = alpha_begin; m1 <= alpha_end; m1++) {
@@ -671,17 +898,6 @@ namespace fkpm {
                     alpha_end   = std::min(M-1, alpha_end + a_chunk_ncols);
                 }
             }
-            temp_d.deallocate();
-            Rchunk_d.deallocate();
-            atild0_d.deallocate();
-            j1_RowPtr_d.deallocate();
-            j1_ColIdx_d.deallocate();
-            j1_Values_d.deallocate();
-            j2_RowPtr_d.deallocate();
-            j2_ColIdx_d.deallocate();
-            j2_Values_d.deallocate();
-            for (int i = 0; i < alpha.size(); i++) alpha[i].deallocate();
-            for (int i = 0; i < atild.size(); i++) atild[i].deallocate();
             return mu;
         }
         
@@ -696,7 +912,7 @@ namespace fkpm {
             assert(D.n_rows == n_rows && D.n_cols == n_rows && D.b_len == b_len);
             assert(b_len*n_rows == this->R.n_rows && b_len*n_rows >= this->R.n_cols);
             
-            a_d[0].from_device(R_d);            // a0 = T_0[H] R = R
+            a_d[0] = R_d;                       // a0 = T_0[H] R = R
             cgemm_H(1, R_d, 0, a_d[1]);         // a1 = T_1[H] R = H R
             
             // xi = c0 a0 + c1 a1
@@ -708,7 +924,7 @@ namespace fkpm {
             
             int M = c.size();
             for (int m = 2; m < M; m++) {
-                a_d[2].from_device(a_d[0]);
+                a_d[2] = a_d[0];
                 cgemm_H(2, a_d[1], -1, a_d[2]); // a2 = T_m[H] R = 2 H a1 - a0
                 
                 // xi += cm a2
@@ -765,7 +981,7 @@ namespace fkpm {
             }
             else {
                 // b0 = 2 c[M-1] a1
-                b_d[0].from_device(a_d[0]);
+                b_d[0] = a_d[0];
                 T_re scal0 = 2*c[M-1];
                 TRY(gen_scal(bl_handle, b_d[0].size, &scal0, (T_cu *)b_d[0].ptr, 1));
             }
@@ -784,7 +1000,7 @@ namespace fkpm {
                 a_d[2] = a_d[1];
                 a_d[1] = a_d[0];
                 a_d[0] = temp;
-                a_d[0].from_device(a_d[2]);
+                a_d[0] = a_d[2];
                 cgemm_H(2, a_d[1], -1, a_d[0]); // a0 = 2 H a1 - a2
                 
                 // (b0, b1, b2) <= (2 H b1 - b2, a0, a1)
@@ -792,7 +1008,7 @@ namespace fkpm {
                 b_d[2] = b_d[1];
                 b_d[1] = b_d[0];
                 b_d[0] = temp;
-                b_d[0].from_device(b_d[2]);
+                b_d[0] = b_d[2];
                 cgemm_H(2, b_d[1], -1, b_d[0]);
                 
                 // b0 += 4*c[2*m]*a1
