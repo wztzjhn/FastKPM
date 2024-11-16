@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.18)
 
 project(fastkpm)
 set(FASTKPM_VERSION 0.1.0)
@@ -12,21 +12,17 @@ set(INSTALL_LIB_DIR lib CACHE PATH "Installation directory for libraries")
 set(INSTALL_INCLUDE_DIR include CACHE PATH "Installation directory for header files")
 set(INSTALL_CMAKE_DIR lib/CMake/fastkpm CACHE PATH "Installation directory for CMake files")
 
+# C++17
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
+endif()
+
 # Performance/debug options
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -g -gdwarf-3")
 add_definitions(-D_GLIBCXX_DEBUG=1) # libstdc++
 add_definitions(-D_LIBCPP_DEBUG2=1) # libc++
-
-# C++11
-include(CheckCXXCompilerFlag)
-check_cxx_compiler_flag("-std=c++11" COMPILER_SUPPORTS_CXX11)
-if(NOT COMPILER_SUPPORTS_CXX11)
-  message(FATAL_ERROR "The compiler ${CMAKE_CXX_COMPILER} has no C++11 support. Aborting.")
-endif()
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
-endif()
 
 # Mac fixes
 if (APPLE)
