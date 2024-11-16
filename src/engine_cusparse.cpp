@@ -64,12 +64,12 @@ namespace fkpm {
             std::abort();
         }
     }
-    
+
     inline float           cuda_cast(float  x)    { return x; };
     inline double          cuda_cast(double x)    { return x; };
     inline cuFloatComplex  cuda_cast(cx_float x)  { return make_cuFloatComplex(x.real(), x.imag()); };
     inline cuDoubleComplex cuda_cast(cx_double x) { return make_cuDoubleComplex(x.real(), x.imag()); };
-    
+
     inline float  cuda_real(float  x)          { return x; };
     inline double cuda_real(double x)          { return x; };
     inline float  cuda_real(cuFloatComplex x)  { return x.x; };
@@ -96,11 +96,11 @@ namespace fkpm {
         return cublasCgeam(handle, transa, transb, m, n, alpha, A, lda, beta, B, ldb, C, ldc);
     }
     inline // cx_double
-    cublasStatus_t gen_geam(cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb, int m, int n, const cuDoubleComplex *alpha, 
+    cublasStatus_t gen_geam(cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb, int m, int n, const cuDoubleComplex *alpha,
                             const cuDoubleComplex *A, int lda, const cuDoubleComplex *beta, const cuDoubleComplex *B, int ldb, cuDoubleComplex *C, int ldc) {
         return cublasZgeam(handle, transa, transb, m, n, alpha, A, lda, beta, B, ldb, C, ldc);
     }
-    
+
     // -- BSRMV (block sparse matrix-vector multiplication) --
     inline // float
     cusparseStatus_t gen_bsrmv(cusparseHandle_t handle, cusparseDirection_t dirA, cusparseOperation_t transA,
@@ -134,7 +134,7 @@ namespace fkpm {
         if (blockDim == 1) throw std::runtime_error("blockDim==1 no longer supported in bsrmv.");
         return cusparseZbsrmv(handle, dirA, transA, mb, nb, nnzb, alpha, descrA, bsrValA, bsrRowPtrA, bsrColIndA, blockDim, x, beta, y);
     }
-    
+
     // -- BSRMM (block sparse-dense matrix multiplication) --
     inline // float
     cusparseStatus_t gen_bsrmm(cusparseHandle_t handle, cusparseDirection_t dirA, cusparseOperation_t transA, cusparseOperation_t transB,
@@ -343,7 +343,7 @@ namespace fkpm {
     cublasStatus_t gen_dotc(cublasHandle_t handle, int n, const cuDoubleComplex *x, int incx, const cuDoubleComplex *y, int incy, cuDoubleComplex *result) {
         return cublasZdotc(handle, n, x, incx, y, incy, result);
     }
-    
+
     // -- AXPY (y = alpha*x + y) --
     inline // float
     cublasStatus_t gen_axpy(cublasHandle_t handle, int n, const float *alpha, const float *x, int incx, float *y, int incy) {
@@ -361,7 +361,7 @@ namespace fkpm {
     cublasStatus_t gen_axpy(cublasHandle_t handle, int n, const cuDoubleComplex *alpha, const cuDoubleComplex *x, int incx, cuDoubleComplex *y, int incy) {
         return cublasZaxpy(handle, n, alpha, x, incx, y, incy);
     }
-    
+
     // -- SCAL (x = alpha*x) --
     inline // float*Vec<float>
     cublasStatus_t gen_scal(cublasHandle_t handle, int n, const float *alpha, float *x, int incx) {
@@ -387,11 +387,11 @@ namespace fkpm {
     cublasStatus_t gen_scal(cublasHandle_t handle, int n, const double *alpha, cuDoubleComplex *x, int incx) {
         return cublasZdscal(handle, n, alpha, x, incx);
     }
-    
+
     template <typename T, typename T_re>
     void outer_product(int b_rows, int b_len, int n_cols, T_re alpha, const T *A, const T *B,
                        int n_blocks, const int *D_row_idx, const int *D_col_idx, T *D_val);
-    
+
     template <typename T>
     class CuVec {
     public:
@@ -490,41 +490,41 @@ namespace fkpm {
         typedef decltype(cuda_cast(T(0))) T_cu;
         const T_cu zero_cu = cuda_cast(T(0));
         const T_cu one_cu  = cuda_cast(T(1));
-        
+
         int device = 0;
         EnergyScale es{0, 0};
         int n_rows = 0;
         int b_len = 0;
         int n_blocks = 0;
         Vec<T> Hs_val;
-        
+
         cublasHandle_t bl_handle;
         cusparseHandle_t cs_handle;
         cusparseMatDescr_t cs_mat_descr;
-        
+
         CuVec<T> R_d, xi_d, t_d;
         CuVec<T> a_d[3];
         CuVec<T> b_d[3];
 
         CuSpMat<T> H_d;
-        
+
         CuVec<int> DRowIndex_d, DColIndex_d;
         CuVec<T> DVal_d;
-        
+
         Engine_cuSPARSE(int device) {
             this->device = device;
             TRY(cudaSetDevice(device));
-            
+
             TRY(cublasCreate(&bl_handle));
             TRY(cusparseCreate(&cs_handle));
             TRY(cusparseCreateMatDescr(&cs_mat_descr));
             TRY(cusparseSetMatType(cs_mat_descr, CUSPARSE_MATRIX_TYPE_GENERAL));
             TRY(cusparseSetMatIndexBase(cs_mat_descr, CUSPARSE_INDEX_BASE_ZERO));
         }
-        
+
         ~Engine_cuSPARSE() {
             TRY(cudaSetDevice(device));
-            
+
             TRY(cusparseDestroyMatDescr(cs_mat_descr));
             TRY(cusparseDestroy(cs_handle));
             TRY(cublasDestroy(bl_handle));
@@ -594,16 +594,16 @@ namespace fkpm {
                 TRY(cusparseDestroyDnMat(cs_matC_descr));
             }
         }
-        
+
         EnergyScale energy_scale(SpMatBsr<T> const& H, double extend, int iters) {
             TRY(cudaSetDevice(device));
             assert(H.n_rows == H.n_cols);
-            
+
             // Storage for sparse matrix H
             int nb = H.n_rows;
             int n = H.n_rows * H.b_len;
             CuSpMat<T> H_cu(H.n_rows, H.n_cols, H.b_len, H.n_blocks(), H.row_ptr, H.col_idx, H.val);
-            
+
             // Storage for dense vectors
             CuVec<T> v0_d, v1_d, w_d;
             v0_d.resize(n);
@@ -613,11 +613,11 @@ namespace fkpm {
             v1 /= std::sqrt(std::real(arma::cdot(v1, v1)));
             v1_d.from_host(n, v1.memptr());
             w_d.resize(n);
-            
+
             // Storage for tridiagonal matrix elements
             Vec<double> alpha(iters), beta(iters);
             beta[0] = 0;
-            
+
             for (int j = 1; j < iters; j++) {
                 // w = H * v1
                 productMV(H_cu, v1_d, w_d, one_cu, zero_cu);
@@ -626,34 +626,34 @@ namespace fkpm {
                 T_cu cdot_res;
                 TRY(gen_dotc(bl_handle, n, (T_cu *)w_d.ptr, 1, (T_cu *)v1_d.ptr, 1, &cdot_res));
                 alpha[j-1] = cuda_real(cdot_res);
-                
+
                 // w = w - alpha[j-1] * v1 - beta[j-1] * v0;
                 T_cu scal = cuda_cast(T(-alpha[j-1]));
                 TRY(gen_axpy(bl_handle, n, &scal, (T_cu *)v1_d.ptr, 1, (T_cu *)w_d.ptr, 1));
                 scal = cuda_cast(T(-beta[j-1]));
                 TRY(gen_axpy(bl_handle, n, &scal, (T_cu *)v0_d.ptr, 1, (T_cu *)w_d.ptr, 1));
-                
+
                 // beta[j] = sqrt(real(w dot w))
                 TRY(gen_dotc(bl_handle, n, (T_cu *)w_d.ptr, 1, (T_cu *)w_d.ptr, 1, &cdot_res));
                 beta[j] = std::sqrt(cuda_real(cdot_res));
-                
+
                 // v0 = v1;
                 v0_d = v1_d;
-                
+
                 // v1 = w / beta[j];
                 v1_d = w_d;
                 scal = cuda_cast(T(1.0 / beta[j]));
                 TRY(gen_scal(bl_handle, n, &scal, (T_cu *)v1_d.ptr, 1));
             }
-            
+
             // w = H * v1;
             productMV(H_cu, v1_d, w_d, one_cu, zero_cu);
-            
+
             // alpha[iters-1] = real(w dot v1)
             T_cu cdot_res;
             TRY(gen_dotc(bl_handle, n, (T_cu *)w_d.ptr, 1, (T_cu *)v1_d.ptr, 1, &cdot_res));
             alpha[iters-1] = cuda_real(cdot_res);
-            
+
             // Find eigenvalues of tridiagonal matrix
             arma::mat tri(iters, iters);
             tri.zeros();
@@ -664,22 +664,22 @@ namespace fkpm {
                 tri(j, j) = alpha[j];
             }
             arma::vec evals = arma::eig_sym(tri);
-            
+
             // Stretch energy scale by amount "extend" on each side
             double eig_min = *std::min_element(evals.begin(), evals.end());
             double eig_max = *std::max_element(evals.begin(), evals.end());
             double slack = extend * (eig_max - eig_min);
             return {eig_min-slack, eig_max+slack};
         }
-        
+
         void transfer_R() {
             TRY(cudaSetDevice(device));
-            
+
             if (this->R.n_cols == 0) {
                 std::cerr << "Cannot handle empty R matrix! Device " << device << ". Exiting.\n";
                 std::exit(EXIT_FAILURE);
             }
-            
+
             int sz = this->R.size();
             xi_d.resize(sz);
             R_d.resize(sz);
@@ -697,16 +697,16 @@ namespace fkpm {
             TRY(gen_geam(bl_handle, CUBLAS_OP_T, CUBLAS_OP_T, s, n, &one_cu, (T_cu *)t_d.ptr, n,
                          &zero_cu, (T_cu *)t_d.ptr, n, (T_cu *)R_d.ptr, s));
         }
-        
+
         void set_H(SpMatBsr<T> const& H, EnergyScale const& es) {
             TRY(cudaSetDevice(device));
             assert(H.n_rows == H.n_cols);
-            
+
             this->es = es;
             n_rows = H.n_rows;
             b_len = H.b_len;
             n_blocks = H.n_blocks();
-            
+
             // Hs = H/es.mag()
             Hs_val.resize(H.val.size());
             for (int k = 0; k < H.val.size(); k++) {
@@ -728,56 +728,56 @@ namespace fkpm {
 
             H_d = CuSpMat<T>(H.n_rows, H.n_cols, H.b_len, H.n_blocks(), H.row_ptr, H.col_idx, Hs_val);
         }
-        
+
         // C = (alpha H B^T)^T + beta C
         // H: n*n, B_d: s*n, C_d: s*n, t_d: n*s
         void cgemm_H(T alpha, CuVec<T> const& B_d, T beta, CuVec<T> const& C_d, int s = -1) {
             int n = this->R.n_rows;
             if (s < 1) s = this->R.n_cols;
-            
+
             // t = H B^T
             productMM(H_d, B_d, t_d, one_cu, zero_cu);
-            
+
             // C = alpha t^T + beta C
             T_cu alpha_cu = cuda_cast(alpha);
             T_cu beta_cu  = cuda_cast(beta);
             TRY(gen_geam(bl_handle, CUBLAS_OP_T, CUBLAS_OP_N, s, n, &alpha_cu, (T_cu *)t_d.ptr, n,
                          &beta_cu, (T_cu *)C_d.ptr, s, (T_cu *)C_d.ptr, s));
         }
-        
+
         // y = alpha H x + beta y
         void cgemv_H(T alpha, CuVec<T> const& x_d, T beta, CuVec<T> const& y_d) {
             T_cu alpha_cu = cuda_cast(alpha);
             T_cu beta_cu  = cuda_cast(beta);
             productMV(H_d, x_d, y_d, alpha_cu, beta_cu);
         }
-        
+
         Vec<double> moments(int M) {
             TRY(cudaSetDevice(device));
             assert(b_len*n_rows == this->R.n_rows);
             assert(M % 2 == 0);
-            
+
             Vec<double> mu(M);
-            
+
             a_d[0] = R_d;                       // a0 = \alpha_0 = R
             a_d[1].memset(0);
             cgemm_H(1, R_d, 0, a_d[1]);         // a1 = \alpha_1 = H R
-            
+
             T_cu result1, result2;
             TRY(gen_dotc(bl_handle, this->R.size(), (T_cu *)a_d[0].ptr, 1, (T_cu *)a_d[0].ptr, 1, &result1));
             TRY(gen_dotc(bl_handle, this->R.size(), (T_cu *)a_d[1].ptr, 1, (T_cu *)a_d[0].ptr, 1, &result2));
             mu[0] = cuda_real(result1);
             mu[1] = cuda_real(result2);
-            
+
             for (int m = 1; m < M/2; m++) {
                 a_d[2] = a_d[0];
                 cgemm_H(2, a_d[1], -1, a_d[2]); // a2 = 2 H a1 - a0
-                
+
                 auto temp = a_d[0];
                 a_d[0] = a_d[1];
                 a_d[1] = a_d[2];
                 a_d[2] = temp;
-                
+
                 // 2 \alpha_m^\dagger \alpha_m - mu0
                 T_cu result1, result2;
                 TRY(gen_dotc(bl_handle, this->R.size(), (T_cu *)a_d[0].ptr, 1, (T_cu *)a_d[0].ptr, 1, &result1));
@@ -786,15 +786,15 @@ namespace fkpm {
                 // 2 \alpha_{m+1}^\dagger \alpha_m - mu1
                 mu[2*m+1] = 2 * cuda_real(result2) - mu[1];
             }
-            
+
             return mu;
         }
-        
+
         // memory usage in moments2_v1 ~ a_chunk_ncols * R_chunk_ncols (if not including R used outside)
         Vec<Vec<cx_double>> moments2_v1(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op,
                                         int a_chunk_ncols, int R_chunk_ncols) {
             Vec<Vec<cx_double>> mu(M);
-            for (int i = 0; i < M; i++) mu[i].resize(M, 0);
+            for (int i = 0; i < M; i++) mu[i].resize(M, {0.0, 0.0});
             TRY(cudaSetDevice(device));
             size_t mem_free, mem_total;
             double mem_percent;
@@ -828,11 +828,11 @@ namespace fkpm {
             alpha[1].memset(0);
             atild[1].memset(0);
             t_d.memset(0);
-            
+
             TRY(cudaMemGetInfo(&mem_free,&mem_total));
             mem_percent = 1.0- (double) mem_free/mem_total;
             if(mem_percent > 0.7) std::cout << "Warning2: gpu mem used " << mem_percent << "!\n";
-            
+
             for (int k = 0; k < this->R.n_cols; k += R_chunk_ncols) {
                 if (k + R_chunk_ncols > this->R.n_cols) {
                     s  = this->R.n_cols - k;
@@ -900,43 +900,43 @@ namespace fkpm {
             }
             return mu;
         }
-        
+
         Vec<Vec<cx_double>> moments2_v2(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op,
                                         int a_chunk_ncols, int R_chunk_ncols) {
             std::cerr << "moments2_v2 unimplemented on GPU\n";
             std::exit(EXIT_FAILURE);
         }
-        
+
         void stoch_matrix(Vec<double> const& c, SpMatBsr<T>& D) {
             TRY(cudaSetDevice(device));
             assert(D.n_rows == n_rows && D.n_cols == n_rows && D.b_len == b_len);
             assert(b_len*n_rows == this->R.n_rows && b_len*n_rows >= this->R.n_cols);
-            
+
             a_d[0] = R_d;                       // a0 = T_0[H] R = R
             cgemm_H(1, R_d, 0, a_d[1]);         // a1 = T_1[H] R = H R
-            
+
             // xi = c0 a0 + c1 a1
             xi_d.memset(0);
             T_cu scal0 = cuda_cast(T(c[0]));
             T_cu scal1 = cuda_cast(T(c[1]));
             TRY(gen_axpy(bl_handle, this->R.size(), &scal0, (T_cu *)a_d[0].ptr, 1, (T_cu *)xi_d.ptr, 1));
             TRY(gen_axpy(bl_handle, this->R.size(), &scal1, (T_cu *)a_d[1].ptr, 1, (T_cu *)xi_d.ptr, 1));
-            
+
             int M = c.size();
             for (int m = 2; m < M; m++) {
                 a_d[2] = a_d[0];
                 cgemm_H(2, a_d[1], -1, a_d[2]); // a2 = T_m[H] R = 2 H a1 - a0
-                
+
                 // xi += cm a2
                 T_cu scal1 = cuda_cast(T(c[m]));
                 TRY(gen_axpy(bl_handle, this->R.size(), &scal1, (T_cu *)a_d[2].ptr, 1, (T_cu *)xi_d.ptr, 1));
-                
+
                 auto temp = a_d[0];
                 a_d[0] = a_d[1];
                 a_d[1] = a_d[2];
                 a_d[2] = temp;
             }
-            
+
             // D_ij = (1/2) [R_ik conj(\xi_jk) + \xi_ik conj(R_jk)]
             DRowIndex_d.from_host(D.row_idx.size(), D.row_idx.data());
             DColIndex_d.from_host(D.col_idx.size(), D.col_idx.data());
@@ -947,33 +947,33 @@ namespace fkpm {
             outer_product(n_rows, b_len, this->R.n_cols, T_re(0.5), (T_cu *)xi_d.ptr, (T_cu *)R_d.ptr,
                           D.n_blocks(), DRowIndex_d.ptr, DColIndex_d.ptr, (T_cu *)DVal_d.ptr);
             DVal_d.to_host(D.val.data());
-            
+
             a_d[0].memset(0);
             a_d[1].memset(0);
         }
-        
+
         void autodiff_matrix(Vec<double> const& c, SpMatBsr<T>& D) {
             TRY(cudaSetDevice(device));
             assert(D.n_rows == n_rows && D.n_cols == n_rows && D.b_len == b_len);
             assert(b_len*n_rows == this->R.n_rows && b_len*n_rows >= this->R.n_cols);
-            
+
             int M = c.size();
             double diag = c[1];
             for (int m = 1; m < M/2; m++) {
                 diag -= c[2*m+1];
             }
-            
+
             D.zeros();
             DRowIndex_d.from_host(D.row_idx.size(), D.row_idx.data());
             DColIndex_d.from_host(D.col_idx.size(), D.col_idx.data());
             DVal_d.from_host(D.val.size(), D.val.data());
-            
+
             // D += diag R R^\dagger
             outer_product(n_rows, b_len, this->R.n_cols, T_re(diag), (T_cu *)R_d.ptr, (T_cu *)R_d.ptr,
                           D.n_blocks(), DRowIndex_d.ptr, DColIndex_d.ptr, (T_cu *)DVal_d.ptr);
             TRY(cudaPeekAtLastError());
             TRY(cudaDeviceSynchronize());
-            
+
             // b1 = \beta_{M/2+1}, b0 = \beta_{M/2}
             b_d[1].memset(0);
             if (M <= 2) {
@@ -985,16 +985,16 @@ namespace fkpm {
                 T_re scal0 = 2*c[M-1];
                 TRY(gen_scal(bl_handle, b_d[0].size, &scal0, (T_cu *)b_d[0].ptr, 1));
             }
-            
+
             for (int m = M/2-1; m >= 1; m--) {
                 // a0 = \alpha_m, b0 = \beta_{m+1}
-                
+
                 // D += 2 \alpha_m \beta_{m+1}^\dagger
                 outer_product(n_rows, b_len, this->R.n_cols, T_re(2), (T_cu *)a_d[0].ptr, (T_cu *)b_d[0].ptr,
                               D.n_blocks(), DRowIndex_d.ptr, DColIndex_d.ptr, (T_cu *)DVal_d.ptr);
                 TRY(cudaPeekAtLastError());
                 TRY(cudaDeviceSynchronize());
-                
+
                 // (a0, a1, a2) <= (2 H a1 - a2, a0, a1)
                 auto temp = a_d[2];
                 a_d[2] = a_d[1];
@@ -1002,7 +1002,7 @@ namespace fkpm {
                 a_d[0] = temp;
                 a_d[0] = a_d[2];
                 cgemm_H(2, a_d[1], -1, a_d[0]); // a0 = 2 H a1 - a2
-                
+
                 // (b0, b1, b2) <= (2 H b1 - b2, a0, a1)
                 temp = b_d[2];
                 b_d[2] = b_d[1];
@@ -1010,7 +1010,7 @@ namespace fkpm {
                 b_d[0] = temp;
                 b_d[0] = b_d[2];
                 cgemm_H(2, b_d[1], -1, b_d[0]);
-                
+
                 // b0 += 4*c[2*m]*a1
                 T_cu scal0 = cuda_cast(T(4*c[2*m]));
                 TRY(gen_axpy(bl_handle, b_d[0].size, &scal0, (T_cu *)a_d[1].ptr, 1, (T_cu *)b_d[0].ptr, 1));
@@ -1023,29 +1023,29 @@ namespace fkpm {
                     TRY(gen_axpy(bl_handle, b_d[0].size, &scal2, (T_cu *)a_d[0].ptr, 1, (T_cu *)b_d[0].ptr, 1));
                 }
             }
-            
+
             // D += \alpha_0 \beta_1^\dagger
             outer_product(n_rows, b_len, this->R.n_cols, T_re(1), (T_cu *)a_d[0].ptr, (T_cu *)b_d[0].ptr,
                           D.n_blocks(), DRowIndex_d.ptr, DColIndex_d.ptr, (T_cu *)DVal_d.ptr);
             TRY(cudaPeekAtLastError());
             TRY(cudaDeviceSynchronize());
-            
+
             DVal_d.to_host(D.val.data());
             D.symmetrize();
             D.scale(1.0/es.mag());
-            
+
             a_d[0].memset(0);
             a_d[1].memset(0);
         }
     };
-    
-    
+
+
     template <typename T>
     class Engine_Threaded: public Engine<T> {
     public:
         int n_threads;
         Vec<std::shared_ptr<Engine<T>>> workers;
-        
+
         void run_workers(std::function<void(int)> fn) {
             Vec<std::thread> threads;
             for (int t = 0; t < n_threads; t++) {
@@ -1055,15 +1055,15 @@ namespace fkpm {
                 threads[t].join();
             }
         }
-        
+
         Engine_Threaded(Vec<std::shared_ptr<Engine<T>>> workers):
             n_threads(workers.size()),
             workers(workers) {}
-        
+
         EnergyScale energy_scale(SpMatBsr<T> const& H, double extend, int iters) {
             return workers[0]->energy_scale(H, extend, iters);
         }
-        
+
         void set_R_identity(int n, int j_start, int j_end) {
             run_workers([&](int t) {
                 int sz = j_end - j_start;
@@ -1072,7 +1072,7 @@ namespace fkpm {
                 workers[t]->set_R_identity(n, j1, j2);
             });
         }
-        
+
         void set_R_uncorrelated(int n, int s, RNG& rng, int j_start, int j_end) {
             run_workers([&](int t) {
                 RNG rng0 = rng;
@@ -1084,7 +1084,7 @@ namespace fkpm {
             });
             rng.discard(j_end - j_start);
         }
-        
+
         void set_R_correlated(Vec<int> const& groups, RNG& rng, int j_start, int j_end) {
             run_workers([&](int t) {
                 RNG rng0 = rng;
@@ -1096,13 +1096,13 @@ namespace fkpm {
             });
             rng.discard(j_end - j_start);
         }
-        
+
         void set_H(SpMatBsr<T> const& H, EnergyScale const& es) {
             run_workers([&](int t) {
                 workers[t]->set_H(H, es);
             });
         }
-        
+
         Vec<double> moments(int M) {
             Vec<Vec<double>> mus(n_threads);
             run_workers([&](int t) {
@@ -1115,7 +1115,7 @@ namespace fkpm {
             }
             return mus[0];
         }
-        
+
         Vec<Vec<cx_double>> moments2_v1(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op,
                                         int a_chunk_ncols=0, int R_chunk_ncols=0) {
             Vec<Vec<Vec<cx_double>>> mus(n_threads);
@@ -1131,7 +1131,7 @@ namespace fkpm {
             }
             return mus[0];
         }
-        
+
         Vec<Vec<cx_double>> moments2_v2(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op,
                                         int a_chunk_ncols=0, int R_chunk_ncols=0) {
             if (n_threads > 1) {
@@ -1139,7 +1139,7 @@ namespace fkpm {
             }
             return workers[0]->moments2_v2(M, j1op, j2op, a_chunk_ncols, R_chunk_ncols);
         }
-        
+
         void stoch_matrix(Vec<double> const& c, SpMatBsr<T>& D) {
             Vec<SpMatBsr<T>> Ds(n_threads, D);
             run_workers([&](int t) {
@@ -1152,7 +1152,7 @@ namespace fkpm {
                 }
             }
         }
-        
+
         void autodiff_matrix(Vec<double> const& c, SpMatBsr<T>& D) {
             Vec<SpMatBsr<T>> Ds(n_threads, D);
             run_workers([&](int t) {
@@ -1166,7 +1166,7 @@ namespace fkpm {
             }
         }
     };
-    
+
     static bool printed_devices = false;
     template <typename T>
     std::shared_ptr<Engine<T>> mk_engine_cuSPARSE(Vec<int> devices) {
@@ -1177,7 +1177,7 @@ namespace fkpm {
         int err = cudaGetDeviceCount(&count);
         switch (err) {
             case cudaSuccess:
-                if (devices.size() == 0) {
+                if (devices.empty()) {
                     for (int i = 0; i < count; i++) devices.push_back(i);
                 }
                 for (int d : devices) {
@@ -1213,7 +1213,7 @@ namespace fkpm {
         }
         return ret;
     }
-    
+
     template std::shared_ptr<Engine<float>> mk_engine_cuSPARSE(Vec<int> devices);
     template std::shared_ptr<Engine<double>> mk_engine_cuSPARSE(Vec<int> devices);
     template std::shared_ptr<Engine<cx_float>> mk_engine_cuSPARSE(Vec<int> devices);

@@ -3,10 +3,10 @@
 #include <cassert>
 
 namespace fkpm {
-    
+
     template <typename T>
     T random_phase(RNG& rng);
-    
+
     // Random number from {+1, -1}
     template <>
     double random_phase(RNG& rng) {
@@ -15,7 +15,7 @@ namespace fkpm {
     }
     template <>
     float random_phase(RNG& rng) { return float(random_phase<double>(rng)); }
-    
+
     // Random number from {+1, +i, -1, -i}
     template <>
     cx_double random_phase(RNG& rng) {
@@ -30,7 +30,7 @@ namespace fkpm {
     }
     template <>
     cx_float random_phase(RNG& rng) { return cx_float(random_phase<cx_double>(rng)); }
-    
+
     template <typename T>
     void Engine<T>::set_R_identity(int n, int j_start, int j_end) {
         assert (0 <= j_start && j_start <= j_end && j_end <= n);
@@ -46,7 +46,7 @@ namespace fkpm {
     void Engine<T>::set_R_identity(int n) {
         set_R_identity(n, 0, n);
     }
-    
+
     template <typename T>
     void Engine<T>::set_R_uncorrelated(int n, int s, RNG& rng, int j_start, int j_end) {
         assert (0 <= j_start && j_start <= j_end && j_end <= s);
@@ -72,7 +72,7 @@ namespace fkpm {
     void Engine<T>::set_R_uncorrelated(int n, int s, RNG& rng) {
         set_R_uncorrelated(n, s, rng, 0, s);
     }
-    
+
     template <typename T>
     void Engine<T>::set_R_correlated(Vec<int> const& groups, RNG& rng, int j_start, int j_end) {
         int n = groups.size();
@@ -114,13 +114,13 @@ namespace fkpm {
             set_R_identity(n, 0, n);
         }
     }
-    
+
     template class Engine<float>;
     template class Engine<double>;
     template class Engine<cx_float>;
     template class Engine<cx_double>;
-    
-    
+
+
     template <typename T>
     std::shared_ptr<Engine<T>> mk_engine() {
         std::shared_ptr<Engine<T>> ret;

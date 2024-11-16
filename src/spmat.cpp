@@ -4,26 +4,26 @@
 #include <cassert>
 
 namespace fkpm {
-    
+
     // --- SpMatElems ----------------------------------------------------------------
- 
+
     template <typename T>
     SpMatElems<T>::SpMatElems(int n_rows, int n_cols, int b_len)
         : n_rows(n_rows), n_cols(n_cols), b_len(b_len)
     {}
-    
+
     template <typename T>
     int SpMatElems<T>::n_blocks() const {
         return row_idx.size();
     }
-    
+
     template <typename T>
     void SpMatElems<T>::clear() {
         row_idx.resize(0);
         col_idx.resize(0);
         val.resize(0);
     }
-    
+
     template <typename T>
     void SpMatElems<T>::add(int i, int j, T const* v) {
         assert(i >= 0 && i < n_rows && j >= 0 && j < n_cols);
@@ -31,17 +31,17 @@ namespace fkpm {
         col_idx.push_back(j);
         val.insert(val.end(), v, v+b_len*b_len);
     }
-    
+
     // --- SpMatBsr ----------------------------------------------------------------
-    
+
     template <typename T>
     SpMatBsr<T>::SpMatBsr() {}
-    
+
     template <typename T>
     SpMatBsr<T>::SpMatBsr(SpMatElems<T> const& elems) {
         build(elems);
     }
-    
+
     template <typename T>
     void SpMatBsr<T>::build(SpMatElems<T> const& elems) {
         n_rows = elems.n_rows;
@@ -51,7 +51,7 @@ namespace fkpm {
         col_idx.resize(elems.n_blocks());
         row_ptr.resize(n_rows+1);
         val.resize(b_len*b_len*elems.n_blocks());
-        
+
         // check if sorted
         bool sorted = true;
         for (int k = 0; k < elems.n_blocks()-1; k++) {
@@ -62,7 +62,7 @@ namespace fkpm {
                 break;
             }
         }
-        
+
         // sort if necessary
         if (!sorted) {
             sorted_ptr_bin.resize(n_rows);
@@ -78,7 +78,7 @@ namespace fkpm {
                 });
             };
             parallel_for(0, n_rows, sort_row);
-            
+
             sorted_ptr.clear();
             for (int i = 0; i < n_rows; i++) {
                 sorted_ptr.insert(sorted_ptr.end(), sorted_ptr_bin[i].begin(), sorted_ptr_bin[i].end());
@@ -90,7 +90,7 @@ namespace fkpm {
                 sorted_ptr[p] = p;
             }
         }
-        
+
         // set row_idx, col_idx, row_ptr, and accumulated val
         int max_row = -1; // largest row observed
         int cnt = 0;      // number of unique (i, j) elements observed
@@ -121,18 +121,18 @@ namespace fkpm {
         while (max_row < n_rows) {
             row_ptr[++max_row] = cnt;
         }
-        
+
         // trim sizes of vectors in case there were duplicates
         row_idx.resize(cnt);
         col_idx.resize(cnt);
         val.resize(b_len*b_len*cnt);
     }
-    
+
     template <typename T>
     int SpMatBsr<T>::n_blocks() const {
         return row_idx.size();
     }
-    
+
     template <typename T>
     void SpMatBsr<T>::clear() {
         row_idx.resize(0);
@@ -140,7 +140,7 @@ namespace fkpm {
         row_ptr.resize(0);
         val.resize(0);
     }
-    
+
     template <typename T>
     int SpMatBsr<T>::find_index(int i, int j) const {
         for (int p = row_ptr[i]; p < row_ptr[i+1]; p++) {
@@ -151,22 +151,22 @@ namespace fkpm {
         std::cerr << "Could not find block index (" << i << "," << j << ") in BSR matrix!\n";
         abort();
     }
-    
+
     template <typename T>
     T* SpMatBsr<T>::operator()(int i, int j) {
         return &val[b_len*b_len*find_index(i, j)];
     }
-    
+
     template <typename T>
     T const* SpMatBsr<T>::operator()(int i, int j) const {
         return &val[b_len*b_len*find_index(i, j)];
     }
-    
+
     template <typename T>
     void SpMatBsr<T>::zeros() {
         std::memset(val.data(), 0, val.size()*sizeof(T));
     }
-    
+
     template <typename T>
     void SpMatBsr<T>::symmetrize() {
         for (int k = 0; k < n_blocks(); k++) {
@@ -187,7 +187,7 @@ namespace fkpm {
             }
         }
     }
-    
+
     template <typename T>
     void SpMatBsr<T>::scale(T alpha) {
         int sz = val.size();
@@ -195,7 +195,7 @@ namespace fkpm {
             val[k] *= alpha;
         }
     }
-    
+
     template <typename T>
     arma::SpMat<T> SpMatBsr<T>::to_arma() const {
         arma::umat locations = arma::umat(2, b_len*b_len*n_blocks());
@@ -214,13 +214,13 @@ namespace fkpm {
         auto values = arma::Col<T>(val);
         return arma::SpMat<T>(true, locations, values, b_len*n_rows, b_len*n_cols);
     }
-    
+
     template <typename T>
     arma::Mat<T> SpMatBsr<T>::to_arma_dense() const {
         return arma::eye<arma::Mat<T>>(b_len*n_rows, b_len*n_rows) * to_arma();
     }
-    
-    
+
+
     // instantiations
     template class SpMatElems<float>;
     template class SpMatElems<double>;
@@ -231,4 +231,3 @@ namespace fkpm {
     template class SpMatBsr<cx_float>;
     template class SpMatBsr<cx_double>;
 }
-

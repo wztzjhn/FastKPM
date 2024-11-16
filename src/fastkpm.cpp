@@ -9,7 +9,7 @@
 #endif
 
 namespace fkpm {
-    
+
     Vec<double> jackson_kernel(int M) {
         auto ret = Vec<double>(M);
         double Mp = M+1.0;
@@ -18,7 +18,7 @@ namespace fkpm {
         }
         return ret;
     }
-    
+
     Vec<double> lorentz_kernel(int M, double lambda) {
         auto ret = Vec<double>(M);
         for (int m = 0; m < M; m++) {
@@ -26,10 +26,10 @@ namespace fkpm {
         }
         return ret;
     }
-    
+
     void chebyshev_fill_array(double x, Vec<double>& ret, int kind) {
         assert(kind == 1 || kind == 2);
-        if (ret.size() > 0)
+        if (!ret.empty())
             ret[0] = 1.0;
         if (ret.size() > 1)
             ret[1] = kind * x;
@@ -37,7 +37,7 @@ namespace fkpm {
             ret[m] = 2*x*ret[m-1] - ret[m-2];
         }
     }
-    
+
     Vec<double> expansion_coefficients(int M, int Mq, std::function<double(double)> f, EnergyScale es) {
         assert(Mq >= M);
         auto kernel = jackson_kernel(M);
@@ -76,7 +76,7 @@ namespace fkpm {
 #endif
         return ret;
     }
-    
+
     Vec<Vec<cx_double>> electrical_conductivity_coefficients(int M, int Mq, double kT, double mu,
                                                              double omega, EnergyScale es, Vec<double> const& kernel) {
         assert(kernel.size() == M);
@@ -86,10 +86,10 @@ namespace fkpm {
         double omega_scaled = omega / es.mag();                                 // rescale omega
         Vec<Vec<cx_double>> ret(M);
         for (int i = 0; i < M; i++) {                                           // initialize cmn to 0
-            ret[i].resize(M, 0.0);
+            ret[i].resize(M, {0.0, 0.0});
         }
         if (omega_scaled >= 2.0 ) return ret;
-        
+
         if (omega_scaled < 1e-10) {                                             // static conductivity
 #ifdef WITH_FFTW
             double *x1, *x2, *yc1, *yc2, *ys1, *ys2;
@@ -205,22 +205,22 @@ namespace fkpm {
                     ret[m1][m2] *= cx_double(temp_m2, 0.0);
                 }
             }
-            
+
         }
         return ret;
     }
 
-    
+
     Vec<double> moment_transform(Vec<double> const& moments, int Mq) {
         int M = moments.size();
         auto T = Vec<double>(M);
         auto mup = Vec<double>(M);
         auto gamma = Vec<double>(Mq);
-        
+
         auto kernel = jackson_kernel(M);
         for (int m = 0; m < M; m++)
             mup[m] = moments[m] * kernel[m];
-        
+
         // TODO: replace with DCT-III, mup -> gamma (caution, double check FFTW docs)
         for (int i = 0; i < Mq; i++) {
             gamma[i] = 0.0;
@@ -232,7 +232,7 @@ namespace fkpm {
         }
         return gamma;
     }
-    
+
     Vec<Vec<cx_double>> moment_transform(Vec<Vec<cx_double>> const& moments, int Mq, Vec<double> const& kernel) {
         int M = moments.size();
         auto T_i = Vec<double>(M);
@@ -241,14 +241,14 @@ namespace fkpm {
         Vec<Vec<cx_double>> gamma(Mq);
         for (int i = 0; i < M; i++)  mup[i].resize(M, cx_double(0.0,0.0));
         for (int i = 0; i < Mq; i++) gamma[i].resize(Mq, cx_double(0.0,0.0));
-        
+
         for (int m1 = 0; m1 < M; m1++) {
             for (int m2 = 0; m2 < M; m2++) {
                 mup[m1][m2] = cx_double((m1 == 0 ? 1.0 : 2.0) * (m2 == 0 ? 1.0 : 2.0)
                                         * kernel[m1] * kernel[m2], 0.0) * moments[m1][m2];
             }
         }
-        
+
         // TODO replace with fftw
         for (int i = 0; i < Mq; i++) {
             double x_i = cos(Pi * (i+0.5) / Mq);
@@ -265,7 +265,7 @@ namespace fkpm {
         }
         return gamma;
     }
-    
+
     double moment_product(Vec<double> const& c, Vec<double> const& mu) {
         int M = c.size();
         double ret = 0;
@@ -288,7 +288,7 @@ namespace fkpm {
         }
         return ret;
     }
-    
+
     double density_product(Vec<double> const& gamma, std::function<double(double)> f, EnergyScale es) {
         int Mq = gamma.size();
         double ret = 0.0;
@@ -298,7 +298,7 @@ namespace fkpm {
         }
         return ret / Mq;
     }
-    
+
     void density_function(Vec<double> const& gamma, EnergyScale es, Vec<double>& x, Vec<double>& rho) {
         int Mq = gamma.size();
         x.resize(Mq);
@@ -309,7 +309,7 @@ namespace fkpm {
             rho[Mq-1-i] = gamma[i] / (Pi * sqrt(1-x_i*x_i) * es.mag());
         }
     }
-    
+
     void density_function(Vec<Vec<cx_double>> const& gamma, EnergyScale es, Vec<double>& x, Vec<double>& y, Vec<Vec<cx_double>>& rho) {
         int Mq1 = gamma.size();
         int Mq2 = gamma[0].size();
@@ -336,7 +336,7 @@ namespace fkpm {
             }
         }
     }
-    
+
     void integrated_density_function(Vec<double> const& gamma, EnergyScale es, Vec<double>& x, Vec<double>& irho) {
         int Mq = gamma.size();
         x.resize(Mq);
@@ -349,7 +349,7 @@ namespace fkpm {
             acc += gamma[i];
         }
     }
-    
+
     double fermi_energy(double x, double kT, double mu) {
         double alpha = (x-mu)/std::abs(kT);
         if (kT < 1e-15 || std::abs(alpha) > 20) {
@@ -359,7 +359,7 @@ namespace fkpm {
             return -kT*log(1 + exp(-alpha));
         }
     }
-    
+
     double fermi_density(double x, double kT, double mu) {
         double alpha = (x-mu)/std::abs(kT);
         if (kT < 1e-15 || std::abs(alpha) > 20) {
@@ -369,7 +369,7 @@ namespace fkpm {
             return 1.0/(exp(alpha)+1.0);
         }
     }
-    
+
     double mu_to_filling(Vec<double> const& gamma, EnergyScale const& es, double kT, double mu) {
         using std::placeholders::_1;
         double n_occ = density_product(gamma, std::bind(fermi_density, _1, kT, mu), es);
@@ -384,7 +384,7 @@ namespace fkpm {
         }
         return n_occ/n_tot;
     }
-    
+
     static double root_solver(std::function<double(double)> f, double lo, double hi) {
         int precision_bits = 30;
         boost::math::tools::eps_tolerance<double> tol(precision_bits);
@@ -392,7 +392,7 @@ namespace fkpm {
         auto bds = boost::math::tools::toms748_solve(f, lo, hi, tol, max_iter);
         return 0.5 * (bds.first + bds.second);
     }
-    
+
     double filling_to_mu(Vec<double> const& gamma, EnergyScale const& es, double kT, double filling, double delta_filling) {
         // thermal smearing for faster convergence
         kT = std::max(kT, 0.1*es.mag()/gamma.size());
@@ -414,7 +414,7 @@ namespace fkpm {
         auto minmax = std::minmax_element(evals.begin(), evals.end());
         return root_solver(f, *minmax.first, *minmax.second);
     }
-    
+
     double electronic_grand_energy(Vec<double> const& gamma, EnergyScale const& es, double kT, double mu) {
         using std::placeholders::_1;
         return density_product(gamma, std::bind(fermi_energy, _1, kT, mu), es);
@@ -426,7 +426,7 @@ namespace fkpm {
         }
         return acc;
     }
-    
+
     double electronic_energy(Vec<double> const& gamma, EnergyScale const& es, double kT, double filling, double mu) {
         double n_tot = density_product(gamma, [](double x){return 1;}, es);
         double n_occ = filling*n_tot;
@@ -452,5 +452,5 @@ namespace fkpm {
             return electronic_grand_energy(evals, kT, mu) + mu*n_occ;
         }
     }
-    
+
 }

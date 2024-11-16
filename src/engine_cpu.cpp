@@ -10,7 +10,7 @@ namespace fkpm {
         arma::Mat<T> a0;
         arma::Mat<T> a1;
         arma::Mat<T> a2;
-        
+
         EnergyScale energy_scale(SpMatBsr<T> const& H, double extend, int iters) {
             arma::SpMat<T> Ha = H.to_arma();
             int n = H.n_rows;
@@ -18,10 +18,10 @@ namespace fkpm {
             v0.zeros();
             v1.randn();
             v1 /= std::sqrt(std::real(arma::cdot(v1, v1)));
-            
+
             Vec<double> alpha(iters), beta(iters);
             beta[0] = 0;
-            
+
             for (int j = 1; j < iters; j++) {
                 w = Ha * v1;
                 alpha[j-1] = std::real(arma::cdot(w, v1));
@@ -30,11 +30,11 @@ namespace fkpm {
                 v0 = v1;
                 v1 = w / beta[j];
             }
-            
+
             w = Ha * v1;
             alpha[iters-1] = std::real(arma::cdot(w, v1));
-            
-            
+
+
             arma::mat tri(iters, iters);
             tri.zeros();
             tri(0, 0) = alpha[0];
@@ -49,7 +49,7 @@ namespace fkpm {
             double slack = extend * (eig_max - eig_min);
             return {eig_min-slack, eig_max+slack};
         }
-        
+
         void set_H(SpMatBsr<T> const& H, EnergyScale const& es) {
             assert(H.n_rows == H.n_cols);
             this->es = es;
@@ -59,19 +59,19 @@ namespace fkpm {
             }
             Hs /= es.mag();
         }
-        
+
         Vec<double> moments(int M) {
             int n = this->R.n_rows;
             assert(Hs.n_rows == n && Hs.n_cols == n);
             assert(M % 2 == 0);
-            
+
             Vec<double> mu(M);
-            
+
             a0 = this->R;        // \alpha_0
             a1 = Hs * this->R;   // \alpha_1
             mu[0] = std::real(arma::cdot(a0, a0));
             mu[1] = std::real(arma::cdot(a1, a0));
-            
+
             for (int m = 1; m < M/2; m++) {
                 a2 = 2*Hs*a1 - a0;
                 a0 = a1;         // \alpha_m
@@ -79,7 +79,7 @@ namespace fkpm {
                 mu[2*m]   = 2 * std::real(arma::cdot(a0, a0)) - mu[0];
                 mu[2*m+1] = 2 * std::real(arma::cdot(a1, a0)) - mu[1];
             }
-            
+
             return mu;
         }
 
@@ -91,19 +91,19 @@ namespace fkpm {
             //    alpha_{i,m} = (T_{m+m0}(H) r)_i
             //    atild_{i,m} = (T_{m+m0}(H) j1 r)_i
             arma::Mat<T> alpha, atild;
-            
+
             auto j1 = j1op.to_arma();
             auto j2 = j2op.to_arma();
             int n = this->R.n_rows;
 
             if (a_chunk_ncols < 3) a_chunk_ncols = 10;
             if (a_chunk_ncols > M) a_chunk_ncols = M;
-            
+
             assert(Hs.n_rows == n && Hs.n_cols == n);
             assert(j1.n_rows == n && j1.n_cols == n);
             assert(j2.n_rows == n && j2.n_cols == n);
             assert(M % 2 == 0);
-            
+
             alpha.set_size(n,a_chunk_ncols);
             atild.set_size(n,a_chunk_ncols);
             arma::Col<T> atild_temp(n);
@@ -111,7 +111,7 @@ namespace fkpm {
             for (int i = 0; i < M; i++) {
                 mu[i].resize(M, cx_double(0.0, 0.0)); // mu = 0
             }
-            
+
             // # of sparse * vector operation: O(M^2 * s) if naive, or O(M * s) in the block way
             // # of vector * vector operation: O(M^2 * s) so dominant in time
             for (int k=0; k < this->R.n_cols; k++) {
@@ -153,12 +153,12 @@ namespace fkpm {
             atild_temp.reset();
             alpha.reset();
             atild.reset();
-            
+
             j1.reset();
             j2.reset();
             return mu;
         }
-        
+
         Vec<Vec<cx_double>> moments2_v2(int M, SpMatBsr<T> const& j1op, SpMatBsr<T> const& j2op,
                                         int a_chunk_ncols, int R_chunk_ncols) {
             Vec<arma::Mat<T>> A(M), B(M);
@@ -166,13 +166,13 @@ namespace fkpm {
             int s = this->R.n_cols;
             auto j1 = j1op.to_arma();
             auto j2 = j2op.to_arma();
-            
+
             assert(Hs.n_rows == n && Hs.n_cols == n);
             assert(j1.n_rows == n && j1.n_cols == n);
             assert(j2.n_rows == n && j2.n_cols == n);
             assert(M % 2 == 0);
             assert(n == this->R2.n_rows && s == this->R2.n_cols);
-            
+
             Vec<Vec<cx_double>> mu(M);
             for (int i = 0; i < M; i++) {
                 mu[i].resize(M, cx_double(0.0, 0.0)); // mu = 0
@@ -198,7 +198,7 @@ namespace fkpm {
                     }
                 }
             }
-            
+
             for (int i = 0; i < M; i++) {
                 A[i].reset();
                 B[i].reset();
@@ -207,8 +207,8 @@ namespace fkpm {
             j2.reset();
             return mu;
         }
-        
-        
+
+
         // D += alpha A B^\dagger
         void outer_product(T alpha, arma::Mat<T> const& A, arma::Mat<T> const& B, SpMatBsr<T>& D) {
             for (int k = 0; k < D.n_blocks(); k++) {
@@ -216,7 +216,7 @@ namespace fkpm {
                 int i = D.row_idx[k];
                 int j = D.col_idx[k];
                 T* v = &D.val[b_len*b_len*k];
-                
+
                 for (int bj = 0; bj < b_len; bj++) {
                     for (int bi = 0; bi < b_len; bi++) {
                         v[b_len*bj + bi] += alpha * arma::cdot(B.row(b_len*j+bj), A.row(b_len*i+bi));
@@ -224,17 +224,17 @@ namespace fkpm {
                 }
             }
         }
-        
-        
+
+
         void stoch_matrix(Vec<double> const& c, SpMatBsr<T>& D) {
             int M = c.size();
             int n = this->R.n_rows;
             assert(D.b_len*D.n_rows == Hs.n_rows && D.b_len*D.n_cols == Hs.n_rows);
             assert(Hs.n_rows == n);
-            
+
             a0 = this->R;
             a1 = Hs * this->R;
-            
+
             arma::Mat<T> xi = c[0]*a0 + c[1]*a1;
             for (int m = 2; m < M; m++) {
                 a2 = 2*Hs*a1 - a0;
@@ -242,30 +242,30 @@ namespace fkpm {
                 a0 = a1;
                 a1 = a2;
             }
-            
+
             D.zeros();
             outer_product(0.5, this->R, xi, D);
             outer_product(0.5, xi, this->R, D);
-            
+
             // a0 and a1 matrices are invalid for autodiff
             a0.clear();
             a1.clear();
         }
-        
+
         void autodiff_matrix(Vec<double> const& c, SpMatBsr<T>& D) {
             int M = c.size();
             int n = this->R.n_rows;
             int s = this->R.n_cols;
             assert(D.b_len*D.n_rows == Hs.n_rows && D.b_len*D.n_cols == Hs.n_rows);
             assert(Hs.n_rows == n);
-            
+
             double diag = c[1];
             for (int m = 1; m < M/2; m++) {
                 diag -= c[2*m+1];
             }
             D.zeros();
             outer_product(diag, this->R, this->R, D);
-            
+
             // Note that the \beta_m matrices are the "adjoint nodes" to alpha_m. Specifically,
             // \beta^*_m = (d / d\alpha_m) tr g,
             // This is a total derivative, including all implicit dependencies in the call graph.
@@ -274,17 +274,17 @@ namespace fkpm {
             arma::Mat<T> b0(n, s, arma::fill::zeros);   // \beta_{M/2}
             if (M > 2)
                 b0 = 2 * c[M-1] * a0;   // a0 = \alpha_{M/2-1} after moments() calculation
-            
+
             for (int m = M/2-1; m >= 1; m--) {
                 // a0 = \alpha_m, b0 = \beta_{m+1}
-                
+
                 // D += 2 \alpha_m \beta_{m+1}^\dagger
                 outer_product(2, a0, b0, D);
-                
+
                 a2 = a1;
                 a1 = a0;
                 a0 = 2*Hs*a1 - a2;
-                
+
                 b2 = b1;
                 b1 = b0;
                 b0 = 4*c[2*m]*a1 + 2*c[2*m+1]*a2 + 2*Hs*b1 - b2;
@@ -292,18 +292,18 @@ namespace fkpm {
                     b0 += 2*c[2*m-1]*a0;
                 }
             }
-            
+
             // D += \alpha_0 \beta_1^\dagger
             outer_product(1, a0, b0, D);
             D.symmetrize();
             D.scale(1.0/es.mag());
-            
+
             // a0 and a1 matrices have been invalidated
             a0.clear();
             a1.clear();
         }
     };
-    
+
     template <typename T>
     std::shared_ptr<Engine<T>> mk_engine_cpu() {
         return std::make_shared<Engine_CPU<T>>();
