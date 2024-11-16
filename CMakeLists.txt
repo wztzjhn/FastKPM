@@ -24,13 +24,6 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -g -gdwarf-3")
 add_definitions(-D_GLIBCXX_DEBUG=1) # libstdc++
 add_definitions(-D_LIBCPP_DEBUG2=1) # libc++
 
-# Mac fixes
-if (APPLE)
-  cmake_policy(SET CMP0042 NEW) # @rpath
-  set(LIBS ${LIBS} "-framework Accelerate")
-  set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY "libc++")
-endif()
-
 
 # -- DEPENDENCIES -------------------------------------------
 
@@ -61,24 +54,26 @@ if (MPI_FOUND)
 endif()
 
 # CUDA
-find_package(CUDA 11.3)
-if (CUDA_FOUND)
-  message(STATUS "Found CUDA " ${CUDA_VERSION})
-  include_directories(SYSTEM ${CUDA_INCLUDE_DIRS})
-  set(LIBS ${LIBS} ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES} ${CUDA_cusparse_LIBRARY})
-  add_definitions(-DWITH_CUDA)
-  if (APPLE)
-    # With recent versions of Xcode, must explicitly use clang
-    set(CUDA_HOST_COMPILER /usr/bin/clang)
-  endif()
-  set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-O2;-Xcompiler=-fPIC;
-    -gencode=arch=compute_52,code=sm_52;
-    -gencode=arch=compute_60,code=sm_60;
-    -gencode=arch=compute_61,code=sm_61;
-    -gencode=arch=compute_70,code=sm_70;
-    -gencode=arch=compute_70,code=compute_70)
-  set(CUDA_PROPAGATE_HOST_FLAGS OFF)
+option(WITH_CUDA "Enable CUDA support" ON)
+if(WITH_CUDA)
+    include(CheckLanguage)
+    check_language(CUDA)
+    if(CMAKE_CUDA_COMPILER)
+        enable_language(CUDA)
+        find_package(CUDAToolkit 11.3)
+        if(CUDAToolkit_FOUND)
+            message(STATUS "Found CUDA " ${CUDAToolkit_VERSION})
+            add_definitions(-DWITH_CUDA)
+        else()
+            message(STATUS "CUDA Toolkit not found, building without CUDA support") 
+            set(WITH_CUDA OFF)
+        endif()
+    else()
+        message(STATUS "No CUDA compiler found, building without CUDA support")
+        set(WITH_CUDA OFF)
+    endif()
 endif()
+
 
 # Armadillo
 find_package(Armadillo REQUIRED)

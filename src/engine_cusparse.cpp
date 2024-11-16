@@ -74,10 +74,10 @@ namespace fkpm {
     inline double cuda_real(double x)          { return x; };
     inline float  cuda_real(cuFloatComplex x)  { return x.x; };
     inline double cuda_real(cuDoubleComplex x) { return x.x; };
-    inline cx_double cuda_cmplx(float x)           {return cx_double(x, 0.0); };
-    inline cx_double cuda_cmplx(double x)          {return cx_double(x, 0.0); };
-    inline cx_double cuda_cmplx(cuFloatComplex x)  {return cx_double(x.x, x.y); };
-    inline cx_double cuda_cmplx(cuDoubleComplex x) {return cx_double(x.x, x.y); };
+    inline cx_double cuda_cmplx(float x)           {return {x, 0.0}; };
+    inline cx_double cuda_cmplx(double x)          {return {x, 0.0}; };
+    inline cx_double cuda_cmplx(cuFloatComplex x)  {return {x.x, x.y}; };
+    inline cx_double cuda_cmplx(cuDoubleComplex x) {return {x.x, x.y}; };
 
     // -- GEAM (matrix-matrix addition/transposition) --
     inline // float
@@ -451,7 +451,7 @@ namespace fkpm {
         }
     };
 
-    template <typename T> void swap(CuVec<T> &lhs, CuVec<T> &rhs) {
+    template <typename T> void swap(CuVec<T> &lhs, CuVec<T> &rhs) noexcept {
         std::swap(lhs.size, rhs.size);
         std::swap(lhs.capacity, rhs.capacity);
         std::swap(lhs.ptr, rhs.ptr);
