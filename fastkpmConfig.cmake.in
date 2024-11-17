@@ -1,15 +1,9 @@
-# Defines the following variables
-#  FASTKPM_INCLUDE_DIRS
-#  FASTKPM_LIBRARIES
+@PACKAGE_INIT@
 
-# Compute paths
-get_filename_component(FASTKPM_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
-set(FASTKPM_INCLUDE_DIRS "@CONF_INCLUDE_DIRS@")
+include(CMakeFindDependencyMacro)
 
-# Our library dependencies (contains definitions for IMPORTED targets)
-if(NOT TARGET fastkpm AND NOT fastkpm_BINARY_DIR)
-  include("${FASTKPM_CMAKE_DIR}/fastkpmTargets.cmake")
-endif()
+# Set up include directories
+set_and_check(FASTKPM_INCLUDE_DIR "@PACKAGE_CMAKE_INSTALL_INCLUDEDIR@")
+set(FASTKPM_INCLUDE_DIRS "${FASTKPM_INCLUDE_DIR}")
 
-# These are IMPORTED targets created by fastkpmTargets.cmake
-set(FASTKPM_LIBRARIES fastkpm)
+include("${CMAKE_CURRENT_LIST_DIR}/fastkpmTargets.cmake")

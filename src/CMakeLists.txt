@@ -18,13 +18,11 @@ if(WITH_CUDA)
     target_compile_options(fastkpm PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-O2>)
 
     # Disable host flags propagation by explicitly setting CUDA flags
+    # PASCAL (60,61); VOLTA (70); TURING (75); AMPERE (80,86)
     set_target_properties(fastkpm PROPERTIES
         CUDA_ARCHITECTURES "60;61;70;75;80;86"
         PUBLIC_HEADER "${KPM_INCLUDE}"
-#        CUDA_RESOLVE_DEVICE_SYMBOLS ON
         CUDA_SEPARABLE_COMPILATION ON)
-
-#    target_include_directories(fastkpm SYSTEM PRIVATE ${CUDAToolkit_INCLUDE_DIRS})
 
     target_link_libraries(fastkpm PRIVATE CUDA::cudart CUDA::cublas CUDA::cusparse)
 
@@ -43,4 +41,7 @@ endif()
 install(TARGETS fastkpm
   EXPORT fastkpmTargets
   LIBRARY       DESTINATION "${INSTALL_LIB_DIR}"     COMPONENT shlib
-  PUBLIC_HEADER DESTINATION "${INSTALL_INCLUDE_DIR}" COMPONENT dev)
+  PUBLIC_HEADER DESTINATION "${INSTALL_INCLUDE_DIR}" COMPONENT dev
+  INCLUDES      DESTINATION include
+)
+

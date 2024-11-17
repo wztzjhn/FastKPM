@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.18)
 
-project(fastkpm)
-set(FASTKPM_VERSION 0.1.0)
+project(fastkpm VERSION 0.1.0)
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake_modules)
 
 
@@ -92,31 +91,37 @@ add_subdirectory(src)
 
 # -- INSTALLATION -------------------------------------------
 
-# Generate fastkpmTargets.cmake suitable for use by downstreams
-export(TARGETS fastkpm FILE "${PROJECT_BINARY_DIR}/fastkpmTargets.cmake")
+include(CMakePackageConfigHelpers)
+include(GNUInstallDirs)
 
-# Register the build-tree with a global CMake-registry
-export(PACKAGE fastkpm)
+# Generate and install export targets
+install(EXPORT fastkpmTargets
+    FILE fastkpmTargets.cmake
+    NAMESPACE fastkpm::
+    DESTINATION lib/cmake/fastkpm
+)
 
-# Create the fastkpmConfig.cmake and fastkpmConfigVersion files
-# ... for the build tree
-set(CONF_INCLUDE_DIRS "${PROJECT_SOURCE_DIR}/src")
-configure_file(fastkpmConfig.cmake.in "${PROJECT_BINARY_DIR}/fastkpmConfig.cmake" @ONLY)
-# ... for the install tree
-set(CONF_INCLUDE_DIRS "${INSTALL_INCLUDE_DIR}")
-configure_file(fastkpmConfig.cmake.in "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/fastkpmConfig.cmake" @ONLY)
-# ... for both
-configure_file(fastkpmConfigVersion.cmake.in "${PROJECT_BINARY_DIR}/fastkpmConfigVersion.cmake" @ONLY)
+# Generate the version file
+write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/fastkpmConfigVersion.cmake"
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion
+)
 
-# Install fastkpmConfig.cmake and fastkpmConfigVersion.cmake
+# Configure the config file
+configure_package_config_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/fastkpmConfig.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/fastkpmConfig.cmake"
+    INSTALL_DESTINATION lib/cmake/fastkpm
+    PATH_VARS CMAKE_INSTALL_INCLUDEDIR
+)
+
+# Install the config files
 install(FILES
-  "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/fastkpmConfig.cmake"
-  "${PROJECT_BINARY_DIR}/fastkpmConfigVersion.cmake"
-  DESTINATION "${INSTALL_CMAKE_DIR}" COMPONENT dev)
- 
-# Install fastkpmTargets.cmake
-install(EXPORT fastkpmTargets DESTINATION "${INSTALL_CMAKE_DIR}" COMPONENT dev)
-
+    "${CMAKE_CURRENT_BINARY_DIR}/fastkpmConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/fastkpmConfigVersion.cmake"
+    DESTINATION lib/cmake/fastkpm
+)
 
 # -- REPORT -------------------------------------------
 
