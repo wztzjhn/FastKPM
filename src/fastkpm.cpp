@@ -175,8 +175,7 @@ namespace fkpm {
         } else {                                                                // optical conductivity
             std::cout << "Warning: FFTW not implemented yet (electrical_conductivity_coefficients)." << std::endl;
             const int i_start = std::ceil(acos(1.0 - omega_scaled) / Pi * Mq - 0.5);
-
-            assert(M - i_start >= 20);                                          // at least 20 points to do integration
+            assert(Mq - i_start >= 20);                                         // at least 20 points to do integration
             auto T_i = Vec<double>(M); // fill with T_m(x + ω)
             auto T_j = Vec<double>(M); // fill with T_m(x)
             for (int i = i_start; i < Mq; i++) {
