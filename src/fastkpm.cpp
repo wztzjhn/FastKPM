@@ -184,8 +184,8 @@ namespace fkpm {
                 chebyshev_fill_array(x_i + omega_scaled, T_i);
                 chebyshev_fill_array(x_i, T_j);
                 double temp_sqrt2 = std::sqrt(1.0 - (x_i + omega_scaled) * (x_i + omega_scaled));
-                f_i = (fermi_density(es.unscale(x_i), kT, mu) - fermi_density(es.unscale(x_i) + omega, kT, mu))
-                     / (omega * temp_squareroot2);
+                const double f_i = (fermi_density(es.unscale(x_i), kT, mu) - fermi_density(es.unscale(x_i) + omega, kT, mu))
+                                 / (omega_scaled * temp_sqrt2);
                 for (int m1 = 0; m1 < M; m1++) {
                     for (int m2 = 0; m2 < M; m2++) {
                         ret[m1][m2] += T_i[m1] * T_j[m2] * f_i;
